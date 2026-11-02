@@ -1,0 +1,792 @@
+{
+  "state": {
+    "id": "sample-01-checkout-incident",
+    "incidentInput": "Customers are seeing errors at checkout and the site feels slow. Started maybe 15–20 min ago.",
+    "createdAt": "2026-11-02T19:55:22.345Z",
+    "updatedAt": "2026-11-02T19:56:29.851Z",
+    "status": "complete",
+    "summary": "Resolved (USER-003). CFG-502 (inventory DB_POOL_MAX 20->80, confirmed by the owner in USER-001) over-committed orders-db and starved orders-service, which caused the checkout errors. The revert at 14:35 restored connections to 250 and errors to 0.3% (USER-002). The payments latency rise (MET-payments.p95_latency_ms, LOG-046) was a symptom of checkout retries. Order reconciliation and prevention work remain.",
+    "impact": "Onset 13:55, resolved after the 14:35 revert (USER-002, USER-003). Checkout errors peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets. CUST-002: 14 reports of cards charged with no order confirmation, which still need reconciling. Search and browsing were unaffected (CUST-004).",
+    "timeline": [
+      {
+        "ts": "2026-10-28T13:40:00Z",
+        "evidenceId": "DEP-102",
+        "note": "Deploy payments-service v2.14.0: Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2",
+        "kind": "ruled-out",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:52:00Z",
+        "evidenceId": "CFG-502",
+        "note": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-inventory.db_pool_in_use",
+        "note": "Rose 78 -> 290 (peak 323)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-orders_db.active_connections",
+        "note": "Rose 244.5 -> 331 (peak 397)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:00:00Z",
+        "evidenceId": "MET-payments.p95_latency_ms",
+        "note": "Rose 416.25 -> 640 (peak 650), recovered 14:20",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:00:22Z",
+        "evidenceId": "LOG-037",
+        "note": "ERROR orders-service: HikariPool-1 - Connection is not available, request timed out after 3000ms",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:01:36Z",
+        "evidenceId": "LOG-040",
+        "note": "ERROR orders-service: FATAL: sorry, too many clients already",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:03:00Z",
+        "evidenceId": "CUST-001",
+        "note": "Spike in \"Something went wrong\" at Place Order. 87 tickets by 14:30 (normal: ~5/hour).",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:03:05Z",
+        "evidenceId": "LOG-046",
+        "note": "WARN payments-service: inbound request queue depth 42 (client checkout-service retries)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:11:00Z",
+        "evidenceId": "LOG-076",
+        "note": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:18:00Z",
+        "evidenceId": "DEP-103",
+        "note": "Rollback payments-service v2.13.4: Rollback v2.14.0 during INC-2213 investigation",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:22:00Z",
+        "evidenceId": "ALR-014",
+        "note": "[critical] checkout-service 5xx rate above 2% (still firing after payments rollback) (7.4%)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:24:30Z",
+        "evidenceId": "LOG-121",
+        "note": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-11-02T19:55:39.309Z",
+        "evidenceId": "USER-001",
+        "note": "Follow-up: Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.",
+        "kind": "follow-up",
+        "source": "code"
+      },
+      {
+        "ts": "2026-11-02T19:55:53.022Z",
+        "evidenceId": "USER-002",
+        "note": "Follow-up: Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%.",
+        "kind": "follow-up",
+        "source": "code"
+      },
+      {
+        "ts": "2026-11-02T19:56:23.967Z",
+        "evidenceId": "USER-003",
+        "note": "Follow-up: resolved",
+        "kind": "follow-up",
+        "source": "code"
+      }
+    ],
+    "keySignals": [
+      {
+        "evidenceId": "USER-001",
+        "why": "Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.",
+        "source": "code"
+      },
+      {
+        "evidenceId": "USER-002",
+        "why": "Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%.",
+        "source": "code"
+      },
+      {
+        "evidenceId": "USER-003",
+        "why": "resolved",
+        "source": "code"
+      },
+      {
+        "evidenceId": "CFG-502",
+        "why": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-076",
+        "why": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-121",
+        "why": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "source": "code"
+      }
+    ],
+    "noise": [
+      {
+        "evidenceId": "ALR-001",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "outside blast radius",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-002",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "not in catalog",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-003",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      },
+      {
+        "evidenceId": "ALR-011",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "info severity"
+        ]
+      },
+      {
+        "evidenceId": "ALR-013",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "CFG-502 inventory pool increase exhausted orders-db connections, starving orders-service and breaking checkout",
+        "confidence": 0.97,
+        "status": "confirmed",
+        "supporting": [
+          "USER-001",
+          "USER-002",
+          "USER-003",
+          "CFG-502",
+          "LOG-076",
+          "LOG-121",
+          "MET-payments.p95_latency_ms",
+          "LOG-046"
+        ],
+        "contradicting": [],
+        "reasoning": "The owner confirmed the change. Recovery followed the revert and a human reported it resolved. The payments latency rise was caused by checkout retries.",
+        "recoveryEvidence": [
+          "USER-002"
+        ]
+      },
+      {
+        "id": "H2",
+        "statement": "Payments v2.14.0 caused the problem",
+        "confidence": 0.02,
+        "status": "rejected",
+        "supporting": [
+          "DEP-102"
+        ],
+        "contradicting": [
+          "DEP-103",
+          "ALR-014",
+          "USER-002"
+        ],
+        "reasoning": "The rollback did not help. The pool revert alone fixed the incident."
+      }
+    ],
+    "openQuestions": [
+      "Are there duplicate charges or lost orders beyond the 14 reported? Payments and support can check.",
+      "Why was the pool raised? Does inventory need another way to handle that load?"
+    ],
+    "nextActions": [
+      {
+        "action": "Reconcile the 14 orders where the card was charged but no order was confirmed, and release the duplicate holds",
+        "owner": "orders/payments on-call",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "CUST-002"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Re-enable the checkout flag payments_retry_on_timeout now that recovery is verified, if the owner agrees",
+        "owner": "checkout on-call",
+        "type": "flag_change",
+        "risk": "low",
+        "riskReason": "rubric: flag change = low",
+        "phase": "after_recovery",
+        "evidence": [
+          "CFG-504",
+          "USER-002"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Put PgBouncer in front of orders-db (INC-2041 action item)",
+        "owner": "platform/DBA",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041",
+          "CFG-502"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Add a config guardrail on pool sizes against max_connections",
+        "owner": "platform",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041",
+          "CFG-502"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Schedule the postmortem and assign owners to its action items",
+        "owner": "incident commander",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "USER-002",
+          "INC-2041"
+        ],
+        "source": "code"
+      }
+    ],
+    "stakeholderUpdate": "The incident is resolved. Checkout is working normally after we reverted a configuration change that let one internal service take too many database connections, and the change owner confirmed it was the cause. Support is still reconciling the orders where customers were charged without a confirmation. We are planning permanent safeguards to stop this recurring.",
+    "overallConfidence": 0.97,
+    "trace": [
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "get_service_context",
+        "args": {
+          "service": "orders-db"
+        },
+        "resultSummary": "orders-db: orders-db budget 610/400",
+        "ms": 2024
+      },
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "search_logs",
+        "args": {
+          "service": "orders-db",
+          "level": "LOG"
+        },
+        "resultSummary": "2/2 log lines",
+        "ms": 1
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "Likely cause: CFG-502 raised inventory-service DB_POOL_MAX 20->80 at 13:52 (6 replicas, budget 120->480), over-committing orders-db (max 400, no pooler). Inventory holds ~320 connections (LOG-076, LOG-121), total 397/400, starving orders-service (too many clients, Hikari timeouts), causing checkout 5xx and latency. Confidence fairly high but not human-confirmed.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 inventory pool increase exhausted orders-db connections, starving orders-service and breaking checkout",
+              "confidence": 0.85,
+              "status": "active",
+              "supporting": [
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "LOG-040",
+                "LOG-037",
+                "MET-orders_db.active_connections",
+                "MET-inventory.db_pool_in_use"
+              ],
+              "contradicting": [
+                "DEP-103"
+              ],
+              "reasoning": "Onset 13:55 matches the config 3 min earlier. Inventory uses ~320 of 397 connections. The payments rollback and retry-flag change did not fix the 5xx (ALR-014). Payments latency and the reporting CPU spike are secondary: retries and the hourly rollup."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the problem",
+              "confidence": 0.05,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014",
+                "LOG-046"
+              ],
+              "reasoning": "Its error rate and processor latency are unchanged. The rollback did not clear the errors. The latency rise came from checkout retries."
+            }
+          ],
+          "nextActions": [
+            {
+              "action": "Revert inventory-service DB_POOL_MAX to 20 (CFG-502)",
+              "type": "config_revert",
+              "owner": "inventory-service on-call",
+              "evidence": [
+                "CFG-502",
+                "LOG-076"
+              ]
+            },
+            {
+              "action": "Reconcile the 14 orders where the card was charged but no order was confirmed, and release the duplicate holds",
+              "type": "investigate",
+              "owner": "orders/payments on-call",
+              "evidence": [
+                "CUST-002"
+              ]
+            },
+            {
+              "action": "Put PgBouncer in front of orders-db (INC-2041 action item) and add a guardrail on the pool-size budget",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform/DBA",
+              "evidence": [
+                "CFG-502"
+              ]
+            },
+            {
+              "action": "Re-enable the checkout flag payments_retry_on_timeout only after recovery is verified",
+              "type": "flag_change",
+              "phase": "after_recovery",
+              "owner": "checkout on-call",
+              "evidence": [
+                "CFG-504"
+              ]
+            }
+          ],
+          "openQuestions": [
+            "Did the inventory owner intend CFG-502, and why was it made?",
+            "Are there duplicate charges or lost orders? Payments and support can check.",
+            "Does the 14:02 reporting rollup add load? Reporting owner to confirm."
+          ],
+          "impact": "Onset 13:55. Checkout errors peaked at 7.9% and p99 at 5.1s. Orders error rate peaked at 10.3%. CUST-001: 87 tickets by 14:30. CUST-002: 14 reports of cards charged with no order confirmation. Search and browsing are unaffected (CUST-004).",
+          "stakeholderUpdate": "Customers are hitting errors when placing orders, and some have been charged without getting a confirmation. The likely cause is a recent configuration change that lets one internal service use too many database connections, which leaves checkout short of them. We plan to revert that change and then reconcile the affected orders. We will send the next update after the revert."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, nextActions, stakeholderUpdate · policy: nextActions[2]: split into 2 actions so each gets its own risk",
+        "ms": 9436
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "Config-driven connection over-commitment is well supported by the metrics and logs."
+        },
+        "resultSummary": "finalized: Config-driven connection over-commitment is well supported by the metrics and logs.",
+        "ms": 2
+      },
+      {
+        "step": 3,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "Confirmed by the change owner (USER-001): CFG-502 raised inventory-service DB_POOL_MAX 20->80 at 13:52. With 6 replicas this over-committed orders-db (max 400, no pooler). Inventory holds ~320 of 397 connections (LOG-076, LOG-121), which starves orders-service (LOG-040, LOG-037) and causes checkout 5xx and latency. Recovery after the revert is not yet verified.",
+          "impact": "Onset 13:55. Checkout errors peaked at 7.9%, p99 at 5.1s, and orders errors at 10.3%. CUST-001: 87 tickets by 14:30. CUST-002: 14 reports of cards charged with no order confirmation. Search and browsing are unaffected (CUST-004). The incident is still ongoing and the pool revert has not been reported done.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 inventory pool increase (confirmed by owner) exhausted orders-db connections, starving orders-service and breaking checkout",
+              "confidence": 0.92,
+              "status": "confirmed",
+              "supporting": [
+                "USER-001",
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "LOG-040",
+                "LOG-037"
+              ],
+              "contradicting": [
+                "DEP-103"
+              ],
+              "reasoning": "The owner confirmed the change. Timing matches the onset, and the connection split shows inventory dominating. The payments rollback did not help. Recovery after the fix has not been reported, so confidence stays below 0.95."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the problem",
+              "confidence": 0.03,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014",
+                "LOG-046"
+              ],
+              "reasoning": "The rollback did not clear the errors. The payments latency rise came from checkout retries."
+            }
+          ],
+          "openQuestions": [
+            "Why did Marcus make the change? Was it for a load or promo reason that will need another remedy once it is reverted?",
+            "Are there duplicate charges or lost orders? Payments and support can check.",
+            "Does the reporting rollup add load? Reporting owner to confirm."
+          ],
+          "stakeholderUpdate": "Customers are hitting errors when placing orders, and some have been charged without getting a confirmation. The likely cause is a configuration change made at 13:52 that let one internal service use too many database connections, and the change owner has confirmed it. We are reverting it and will check that checkout recovers. Support is reconciling the affected orders. We will send the next update once recovery is verified."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, stakeholderUpdate",
+        "ms": 6705
+      },
+      {
+        "step": 3,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "The owner confirmed the change and the telemetry matches; only recovery verification remains."
+        },
+        "resultSummary": "finalized: The owner confirmed the change and the telemetry matches; only recovery verification remains.",
+        "ms": 2
+      },
+      {
+        "step": 4,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "Resolved: the owner confirmed CFG-502 (DB_POOL_MAX 20->80 at 13:52, USER-001). It over-committed orders-db and starved orders-service, which caused the checkout errors. After the revert at 14:35, connections fell to 250 and checkout errors to 0.3% (USER-002). That confirms the cause and the fix. Follow-up work remains: reconcile orders and add safeguards.",
+          "impact": "Onset 13:55, ended with the revert at 14:35 (USER-002). Checkout errors peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets. CUST-002: 14 reports of cards charged with no order confirmation, which still need reconciling. Search and browsing were unaffected (CUST-004). Metrics are back to baseline.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 inventory pool increase exhausted orders-db connections, starving orders-service and breaking checkout",
+              "confidence": 0.97,
+              "status": "confirmed",
+              "supporting": [
+                "USER-001",
+                "USER-002",
+                "CFG-502",
+                "LOG-076",
+                "LOG-121"
+              ],
+              "contradicting": [],
+              "reasoning": "The owner confirmed the change, and the revert restored connections to 250 and errors to baseline."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the problem",
+              "confidence": 0.02,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014",
+                "USER-002"
+              ],
+              "reasoning": "The rollback did not help. The revert of the pool setting alone fixed the incident."
+            }
+          ],
+          "completedActions": [
+            {
+              "action": "Revert inventory-service DB_POOL_MAX to 20 (CFG-502)",
+              "evidence": [
+                "USER-002"
+              ]
+            }
+          ],
+          "nextActions": [
+            {
+              "action": "Reconcile the 14 orders where the card was charged but no order was confirmed, and release the duplicate holds",
+              "type": "investigate",
+              "owner": "orders/payments on-call",
+              "evidence": [
+                "CUST-002"
+              ]
+            },
+            {
+              "action": "Re-enable the checkout flag payments_retry_on_timeout now that recovery is verified, if the owner agrees",
+              "type": "flag_change",
+              "phase": "after_recovery",
+              "owner": "checkout on-call",
+              "evidence": [
+                "CFG-504",
+                "USER-002"
+              ]
+            },
+            {
+              "action": "Put PgBouncer in front of orders-db (INC-2041 action item)",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform/DBA",
+              "evidence": [
+                "CFG-502"
+              ]
+            },
+            {
+              "action": "Add a config guardrail on pool sizes against max_connections",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform",
+              "evidence": [
+                "CFG-502"
+              ]
+            }
+          ],
+          "openQuestions": [
+            "Are there duplicate charges or lost orders beyond the 14 reported? Payments and support can check.",
+            "Why was the pool raised? Does inventory need another way to handle that load?"
+          ],
+          "stakeholderUpdate": "Checkout has recovered. Errors are back to normal levels after we reverted a configuration change that let one internal service take too many database connections. The change owner confirmed it was the cause. Some customers were charged without an order confirmation, and we are reconciling those orders now. We will follow up on permanent safeguards."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, nextActions, completedActions, stakeholderUpdate",
+        "ms": 7929
+      },
+      {
+        "step": 4,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "The cause is confirmed by the owner and recovery is verified after the revert."
+        },
+        "resultSummary": "finalized: The cause is confirmed by the owner and recovery is verified after the revert.",
+        "ms": 1
+      },
+      {
+        "step": 5,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "Resolved (USER-003). CFG-502 (inventory DB_POOL_MAX 20->80, confirmed by the owner in USER-001) over-committed orders-db and starved orders-service, which caused the checkout errors. The revert at 14:35 restored connections to 250 and errors to 0.3% (USER-002). The payments latency rise (MET-payments.p95_latency_ms, LOG-046) was a symptom of checkout retries. Order reconciliation and prevention work remain.",
+          "impact": "Onset 13:55, resolved after the 14:35 revert (USER-002, USER-003). Checkout errors peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets. CUST-002: 14 reports of cards charged with no order confirmation, which still need reconciling. Search and browsing were unaffected (CUST-004).",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 inventory pool increase exhausted orders-db connections, starving orders-service and breaking checkout",
+              "confidence": 0.97,
+              "status": "confirmed",
+              "supporting": [
+                "USER-001",
+                "USER-002",
+                "USER-003",
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "MET-payments.p95_latency_ms",
+                "LOG-046"
+              ],
+              "contradicting": [],
+              "reasoning": "The owner confirmed the change. Recovery followed the revert and a human reported it resolved. The payments latency rise was caused by checkout retries."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the problem",
+              "confidence": 0.02,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014",
+                "USER-002"
+              ],
+              "reasoning": "The rollback did not help. The pool revert alone fixed the incident."
+            }
+          ],
+          "openQuestions": [
+            "Are there duplicate charges or lost orders beyond the 14 reported? Payments and support can check.",
+            "Why was the pool raised? Does inventory need another way to handle that load?"
+          ],
+          "stakeholderUpdate": "The incident is resolved. Checkout is working normally after we reverted a configuration change that let one internal service take too many database connections, and the change owner confirmed it was the cause. Support is still reconciling the orders where customers were charged without a confirmation. We are planning permanent safeguards to stop this recurring."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, stakeholderUpdate",
+        "ms": 5871
+      },
+      {
+        "step": 5,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "The cause is confirmed, recovery is verified, and only follow-up work remains."
+        },
+        "resultSummary": "finalized: The cause is confirmed, recovery is verified, and only follow-up work remains.",
+        "ms": 1
+      }
+    ],
+    "revisions": [
+      {
+        "at": "2026-11-02T19:55:46.022Z",
+        "trigger": "follow-up USER-001: Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.",
+        "changes": [
+          "incident investigating -> identified",
+          "H1 status active -> confirmed",
+          "H1 confidence 85% -> 92%",
+          "H1 new supporting evidence: USER-001",
+          "H2 confidence 5% -> 3%",
+          "overall confidence 85% -> 92%",
+          "open questions: 2 resolved, 2 new"
+        ]
+      },
+      {
+        "at": "2026-11-02T19:56:00.961Z",
+        "trigger": "follow-up USER-002: Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors…",
+        "changes": [
+          "incident identified -> mitigated",
+          "H1 confidence 92% -> 97%",
+          "H1 new supporting evidence: USER-002",
+          "overall confidence 92% -> 97%",
+          "open questions: 3 resolved, 2 new",
+          "4 new next actions"
+        ]
+      },
+      {
+        "at": "2026-11-02T19:56:29.853Z",
+        "trigger": "follow-up USER-003: resolved",
+        "changes": [
+          "incident mitigated -> resolved",
+          "H1 new supporting evidence: USER-003, MET-payments.p95_latency_ms, LOG-046"
+        ]
+      }
+    ],
+    "groundingIssues": [],
+    "briefSource": "agent",
+    "similarIncidents": [
+      {
+        "incidentId": "INC-2041",
+        "hypothesisId": "H1",
+        "similarity": "Resembles H1 (confirmed). Orders failing, orders-db connection exhaustion: reporting-service raised its DB pool from 15 to 100 to speed up a quarterly report.",
+        "lesson": "30 minutes lost investigating the most recent deploy rather than recent config changes.",
+        "source": "retrieval"
+      }
+    ],
+    "repeatIncident": {
+      "incidentId": "INC-2041",
+      "hypothesisId": "H1",
+      "openActionItems": [
+        "Add PgBouncer in front of orders-db",
+        "Config-service guardrail on pool sizes"
+      ]
+    },
+    "contributingFactors": [
+      {
+        "factor": "Safeguard still missing: \"Add PgBouncer in front of orders-db\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "Safeguard still missing: \"Config-service guardrail on pool sizes\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "CFG-502 was a hot-reloaded config change (inventory-service) that does not appear on the deploy dashboard, so a deploy-focused search misses it; INC-2041 hit the same visibility gap.",
+        "evidence": [
+          "CFG-502",
+          "INC-2041"
+        ],
+        "source": "code"
+      }
+    ],
+    "incidentStatus": "resolved",
+    "doneActions": [
+      {
+        "action": "Revert inventory-service DB_POOL_MAX to 20 (CFG-502)",
+        "evidence": [
+          "USER-002"
+        ],
+        "source": "agent"
+      }
+    ],
+    "unexplained": [],
+    "consistencyIssues": []
+  },
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "history": [],
+  "userEvidence": [
+    {
+      "id": "USER-001",
+      "kind": "user",
+      "timestamp": "2026-11-02T19:55:39.309Z",
+      "title": "Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.",
+      "raw": {
+        "text": "Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52."
+      }
+    },
+    {
+      "id": "USER-002",
+      "kind": "user",
+      "timestamp": "2026-11-02T19:55:53.022Z",
+      "title": "Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%.",
+      "raw": {
+        "text": "Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%."
+      }
+    },
+    {
+      "id": "USER-003",
+      "kind": "user",
+      "timestamp": "2026-11-02T19:56:23.967Z",
+      "title": "resolved",
+      "raw": {
+        "text": "resolved"
+      }
+    }
+  ],
+  "sample": true,
+  "recordedFrom": "anthropic/claude-sonnet-5-5"
+}
