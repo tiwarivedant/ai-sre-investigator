@@ -1,0 +1,636 @@
+{
+  "state": {
+    "id": "inv-20261102200427-b11e92",
+    "incidentInput": "Kafka consumers are lagging.",
+    "createdAt": "2026-11-02T20:04:27.046Z",
+    "updatedAt": "2026-11-02T20:04:37.899Z",
+    "status": "complete",
+    "summary": "Likely cause: CFG-502 raised inventory-service DB_POOL_MAX 20->80 (6 replicas, budget 120->480) at 13:52, exhausting orders-db's 400 connections. Inventory holds ~318 connections (LOG-076); orders-service gets \"too many clients\" (LOG-040) and checkout fails. Payments rollback and retry flag change were not the fix.",
+    "impact": "From 13:55, checkout error rate peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets by 14:30. CUST-002: 14 reports of card charged with no order confirmation, so there is a payment integrity risk.",
+    "timeline": [
+      {
+        "ts": "2026-10-28T13:40:00Z",
+        "evidenceId": "DEP-102",
+        "note": "Deploy payments-service v2.14.0: Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2",
+        "kind": "ruled-out",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:52:00Z",
+        "evidenceId": "CFG-502",
+        "note": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-inventory.db_pool_in_use",
+        "note": "Rose 78 -> 290 (peak 323)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-orders_db.active_connections",
+        "note": "Rose 244.5 -> 331 (peak 397)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:57:33Z",
+        "evidenceId": "LOG-033",
+        "note": "ERROR orders-service: FATAL: remaining connection slots are reserved for non-replication superuser connections",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:01:36Z",
+        "evidenceId": "LOG-040",
+        "note": "ERROR orders-service: FATAL: sorry, too many clients already",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:03:00Z",
+        "evidenceId": "CUST-001",
+        "note": "Spike in \"Something went wrong\" at Place Order. 87 tickets by 14:30 (normal: ~5/hour).",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:11:00Z",
+        "evidenceId": "LOG-076",
+        "note": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:18:00Z",
+        "evidenceId": "DEP-103",
+        "note": "Rollback payments-service v2.13.4: Rollback v2.14.0 during INC-2213 investigation",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:22:00Z",
+        "evidenceId": "ALR-014",
+        "note": "[critical] checkout-service 5xx rate above 2% (still firing after payments rollback) (7.4%)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:24:30Z",
+        "evidenceId": "LOG-121",
+        "note": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      }
+    ],
+    "keySignals": [
+      {
+        "evidenceId": "CFG-502",
+        "why": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-076",
+        "why": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-121",
+        "why": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-040",
+        "why": "ERROR orders-service: FATAL: sorry, too many clients already",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-033",
+        "why": "ERROR orders-service: FATAL: remaining connection slots are reserved for non-replication superuser connections",
+        "source": "code"
+      },
+      {
+        "evidenceId": "MET-orders_db.active_connections",
+        "why": "Rose 244.5 -> 331 (peak 397)",
+        "source": "code"
+      }
+    ],
+    "noise": [
+      {
+        "evidenceId": "ALR-001",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "outside blast radius",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-002",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "not in catalog",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-003",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      },
+      {
+        "evidenceId": "ALR-011",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "info severity"
+        ]
+      },
+      {
+        "evidenceId": "ALR-013",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "inventory-service DB_POOL_MAX 20->80 (CFG-502) over-committed orders-db connections (no pooler), starving orders-service and causing checkout errors",
+        "confidence": 0.85,
+        "status": "active",
+        "supporting": [
+          "CFG-502",
+          "LOG-076",
+          "LOG-121",
+          "LOG-040",
+          "LOG-033",
+          "MET-orders_db.active_connections",
+          "MET-inventory.db_pool_in_use"
+        ],
+        "contradicting": [],
+        "reasoning": "Metrics moved at 13:55 right after CFG-502; inventory holds ~318 of 400 connections; orders-service errors are connection-slot failures. Payments rollback (DEP-103) did not clear checkout 5xx (ALR-014)."
+      },
+      {
+        "id": "H2",
+        "statement": "payments-service v2.14.0 caused the incident",
+        "confidence": 0.07,
+        "status": "rejected",
+        "supporting": [
+          "DEP-102"
+        ],
+        "contradicting": [
+          "ALR-014",
+          "LOG-040"
+        ],
+        "reasoning": "Payments latency is a retry-amplification symptom; the rollback did not fix checkout errors."
+      }
+    ],
+    "openQuestions": [
+      "Did the inventory owner intend CFG-502, and why? Ask the inventory-service on-call.",
+      "How many charged-without-order cases exist? Ask the payments team."
+    ],
+    "nextActions": [
+      {
+        "action": "Revert inventory-service DB_POOL_MAX to 20",
+        "owner": "inventory-service on-call",
+        "type": "config_revert",
+        "risk": "low",
+        "riskReason": "rubric: config revert = low",
+        "phase": "now",
+        "evidence": [
+          "CFG-502"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Reconcile charged-without-order cases and release duplicate holds",
+        "owner": "payments/checkout on-call",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "CUST-002"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Deploy PgBouncer",
+        "owner": "DBA/platform",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041",
+          "LOG-076"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Add a connection-budget guardrail on pool changes",
+        "owner": "DBA/platform",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041",
+          "LOG-076"
+        ],
+        "source": "agent"
+      }
+    ],
+    "stakeholderUpdate": "Some customers are seeing errors when placing orders, and some have been charged without getting a confirmation. The likely cause is a recent setting change that let one service use too many database connections, which starved checkout. We are reverting that setting and will reconcile affected payments. Next update in 30 minutes.",
+    "overallConfidence": 0.85,
+    "trace": [
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "get_service_context",
+        "args": {
+          "service": "orders-db"
+        },
+        "resultSummary": "orders-db: orders-db budget 610/400",
+        "ms": 2023
+      },
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "search_logs",
+        "args": {
+          "service": "orders-db",
+          "level": "LOG"
+        },
+        "resultSummary": "2/2 log lines",
+        "ms": 0
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "Likely cause: CFG-502 raised inventory-service DB_POOL_MAX 20->80 (6 replicas, budget 120->480) at 13:52, exhausting orders-db's 400 connections. Inventory holds ~318 connections (LOG-076); orders-service gets \"too many clients\" (LOG-040) and checkout fails. Payments rollback and retry flag change were not the fix.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "inventory-service DB_POOL_MAX 20->80 (CFG-502) over-committed orders-db connections (no pooler), starving orders-service and causing checkout errors",
+              "confidence": 0.85,
+              "status": "active",
+              "supporting": [
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "LOG-040",
+                "LOG-033",
+                "MET-orders_db.active_connections",
+                "MET-inventory.db_pool_in_use"
+              ],
+              "contradicting": [],
+              "reasoning": "Metrics moved at 13:55 right after CFG-502; inventory holds ~318 of 400 connections; orders-service errors are connection-slot failures. Payments rollback (DEP-103) did not clear checkout 5xx (ALR-014)."
+            },
+            {
+              "id": "H2",
+              "statement": "payments-service v2.14.0 caused the incident",
+              "confidence": 0.07,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "ALR-014",
+                "LOG-040"
+              ],
+              "reasoning": "Payments latency is a retry-amplification symptom; the rollback did not fix checkout errors."
+            }
+          ],
+          "contributingFactors": [
+            {
+              "factor": "No pooler on orders-db; INC-2041 action item still open",
+              "evidence": [
+                "LOG-076"
+              ]
+            },
+            {
+              "factor": "Config changes not on deploy dashboard",
+              "evidence": [
+                "CFG-502"
+              ]
+            },
+            {
+              "factor": "Reporting rollup job added load",
+              "evidence": [
+                "CFG-503"
+              ]
+            }
+          ],
+          "impact": "From 13:55, checkout error rate peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets by 14:30. CUST-002: 14 reports of card charged with no order confirmation, so there is a payment integrity risk.",
+          "nextActions": [
+            {
+              "action": "Revert inventory-service DB_POOL_MAX to 20",
+              "type": "config_revert",
+              "owner": "inventory-service on-call",
+              "evidence": [
+                "CFG-502"
+              ]
+            },
+            {
+              "action": "Reconcile charged-without-order cases and release duplicate holds",
+              "type": "investigate",
+              "owner": "payments/checkout on-call",
+              "evidence": [
+                "CUST-002"
+              ]
+            },
+            {
+              "action": "Deploy PgBouncer and add a connection-budget guardrail on pool changes",
+              "type": "prevention",
+              "owner": "DBA/platform",
+              "evidence": [
+                "LOG-076"
+              ],
+              "phase": "prevention",
+              "priority": "P1"
+            }
+          ],
+          "openQuestions": [
+            "Did the inventory owner intend CFG-502, and why? Ask the inventory-service on-call.",
+            "How many charged-without-order cases exist? Ask the payments team."
+          ],
+          "stakeholderUpdate": "Some customers are seeing errors when placing orders, and some have been charged without getting a confirmation. The likely cause is a recent setting change that let one service use too many database connections, which starved checkout. We are reverting that setting and will reconcile affected payments. Next update in 30 minutes."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, nextActions, contributingFactors, stakeholderUpdate · policy: nextActions[2]: split into 2 actions so each gets its own risk",
+        "ms": 8816
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "Cause is well supported by the connection budget and snapshots."
+        },
+        "resultSummary": "finalized: Cause is well supported by the connection budget and snapshots.",
+        "ms": 2
+      }
+    ],
+    "revisions": [],
+    "groundingIssues": [],
+    "contributingFactors": [
+      {
+        "factor": "Reporting rollup job added load",
+        "evidence": [
+          "CFG-503"
+        ],
+        "source": "agent"
+      },
+      {
+        "factor": "Safeguard still missing: \"Add PgBouncer in front of orders-db\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "Safeguard still missing: \"Config-service guardrail on pool sizes\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "CFG-502 was a hot-reloaded config change (inventory-service) that does not appear on the deploy dashboard, so a deploy-focused search misses it; INC-2041 hit the same visibility gap.",
+        "evidence": [
+          "CFG-502",
+          "INC-2041"
+        ],
+        "source": "code"
+      }
+    ],
+    "briefSource": "agent",
+    "similarIncidents": [
+      {
+        "incidentId": "INC-2041",
+        "hypothesisId": "H1",
+        "similarity": "Resembles H1 (active). Orders failing, orders-db connection exhaustion: reporting-service raised its DB pool from 15 to 100 to speed up a quarterly report.",
+        "lesson": "30 minutes lost investigating the most recent deploy rather than recent config changes.",
+        "source": "retrieval"
+      },
+      {
+        "incidentId": "INC-1987",
+        "hypothesisId": "H2",
+        "similarity": "Resembles H2 (rejected). Checkout 500s after payments deploy: payments-service v2.9.0 shipped a serialization bug for a new card-network field.",
+        "lesson": "payments-service's own error rate jumped from 0.2% to 12% within 2 minutes of the 100% rollout.",
+        "source": "retrieval"
+      }
+    ],
+    "repeatIncident": {
+      "incidentId": "INC-2041",
+      "hypothesisId": "H1",
+      "openActionItems": [
+        "Add PgBouncer in front of orders-db",
+        "Config-service guardrail on pool sizes"
+      ]
+    },
+    "incidentStatus": "investigating",
+    "doneActions": [],
+    "unexplained": [],
+    "consistencyIssues": []
+  },
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "history": [
+    {
+      "role": "user",
+      "content": "A responder reported this incident:\n<incident_report>\nKafka consumers are lagging.\n</incident_report>\n\n## Deterministic pre-analysis (computed by code, not by an LLM)\nDetected onset (earliest sustained metric change-point): 2026-10-28T13:55:00Z\nServices with critical alerts: orders-db, checkout-service, orders-service\n\n### Metric change-points (first bucket > 2x baseline, or >=30% and >=3 sigma above baseline)\n- MET-checkout.error_rate_pct: 13:55 baseline 0.32 -> 1.1, peak 7.9 at 14:05, still elevated at end of data\n- MET-checkout.p99_latency_ms: 13:55 baseline 615 -> 1480, peak 5120 at 14:25, still elevated at end of data\n- MET-inventory.db_pool_in_use: 13:55 baseline 78 -> 290, peak 323 at 14:25, still elevated at end of data\n- MET-inventory.p99_latency_ms: 13:55 baseline 218.75 -> 980, peak 1420 at 14:05, still elevated at end of data\n- MET-orders_db.active_connections: 13:55 baseline 244.5 -> 331, peak 397 at 14:05, still elevated at end of data\n- MET-orders_db.cpu_pct: 13:55 baseline 40 -> 55, peak 66 at 14:05, still elevated at end of data\n- MET-orders.error_rate_pct: 13:55 baseline 0.1 -> 2.4, peak 10.3 at 14:25, still elevated at end of data\n- MET-orders_db.slow_queries_per_min: 14:00 baseline 2 -> 5, peak 6 at 14:05, still elevated at end of data\n- MET-payments.p95_latency_ms: 14:00 baseline 416.25 -> 640, peak 650 at 14:05, back to normal from 14:20\n- MET-reporting.cpu_pct: 14:05 baseline 20.75 -> 91, peak 91 at 14:05, back to normal from 14:25\n\n### Saturation\n- MET-orders_db.active_connections vs MET-orders_db.max_connections: peak 99.25% at 14:05; first >=80% at 13:55\n\n### Changes (deploys + config/flag changes) relative to onset\n- DEP-101 09:12 [deploy] search-service: v3.8.1: Fix typo in facet labels | before_onset_outside_window, -283m from onset | no change-points on its own metrics\n- CFG-501 11:05 [config, NOT on deploy dashboard] web-frontend: flag holiday_banner: false -> true | before_onset_outside_window, -170m from onset | no change-points on its own metrics\n- DEP-102 13:40 [deploy] payments-service: v2.14.0: Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2 (100% at 13:47) | before_onset_in_window, -8m from onset | own metrics with change-points: MET-payments.p95_latency_ms at +5m; unchanged own metrics: MET-payments.error_rate_pct, MET-payments.processor_latency_ms\n- CFG-502 13:52 [config, NOT on deploy dashboard] inventory-service: DB_POOL_MAX: 20 -> 80 | before_onset_in_window, -3m from onset | own metrics with change-points: MET-inventory.db_pool_in_use at +0m, MET-inventory.p99_latency_ms at +0m\n- CFG-503 14:02 [config, NOT on deploy dashboard] reporting-service: hourly_sales_rollup job started | after_onset, 7m from onset | own metrics with change-points: MET-reporting.cpu_pct at +10m\n  after-change effect (5-15m later): MET-reporting.cpu_pct 24 -> 88.5 (268.8%)\n- CFG-504 14:16 [config, NOT on deploy dashboard] checkout-service: flag payments_retry_on_timeout: true -> false | after_onset, 21m from onset | own metrics with change-points: MET-checkout.error_rate_pct at +0m, MET-checkout.p99_latency_ms at +0m; unchanged own metrics: MET-checkout.requests_per_min\n  after-change effect (5-15m later): MET-payments.p95_latency_ms 620 -> 402.5 (-35.1%), MET-reporting.cpu_pct 88 -> 21.5 (-75.6%) (confounded: DEP-103 happened within 5m)\n- DEP-103 14:18 [rollback] payments-service: v2.13.4: Rollback v2.14.0 during INC-2213 investigation | after_onset, 23m from onset | own metrics with change-points: MET-payments.p95_latency_ms at +5m; unchanged own metrics: MET-payments.error_rate_pct, MET-payments.processor_latency_ms\n  after-change effect (5-15m later): MET-payments.p95_latency_ms 620 -> 402.5 (-35.1%), MET-reporting.cpu_pct 88 -> 21.5 (-75.6%) (confounded: CFG-504 happened within 5m)\n\n### Alerts with heuristic noise flags\n- ALR-001 [warning] log-host-03: Disk usage above 85% on log-host-03 | flags: outside_blast_radius, preceded_onset | LIKELY NOISE\n- ALR-002 [warning] api-gateway: TLS certificate for api.internal.example expires in 21 days | flags: not_in_catalog, preceded_onset | LIKELY NOISE\n- ALR-003 [warning] search-service: Health check flapping on search-service pod search-7f9c | flags: resolved_quickly, repeated_flap, outside_blast_radius | LIKELY NOISE\n- ALR-004 [warning] orders-db: orders-db active connections above 80% of max\n- ALR-005 [warning] inventory-service: inventory-service p99 latency above 800ms\n- ALR-006 [critical] orders-db: orders-db active connections above 95% of max\n- ALR-007 [critical] checkout-service: checkout-service 5xx rate above 2%\n- ALR-008 [critical] checkout-service: checkout-service p99 latency above 1500ms (SLO breach)\n- ALR-009 [warning] payments-service: payments-service p95 latency above 600ms\n- ALR-010 [critical] orders-service: orders-service error rate above 5%\n- ALR-011 [info] reporting-service: reporting-service CPU above 85% (hourly_sales_rollup) | flags: info_severity | LIKELY NOISE\n- ALR-012 [critical] checkout-service: INC-2213 opened: Checkout errors and slowness reported by customers\n- ALR-013 [warning] search-service: Health check flapping on search-service pod search-7f9c | flags: resolved_quickly, repeated_flap, outside_blast_radius | LIKELY NOISE\n- ALR-014 [critical] checkout-service: checkout-service 5xx rate above 2% (still firing after payments rollback)\n\n### Customer impact notes from support (untrusted text; cite in Impact)\n- CUST-001: 14:03 onward: spike in \"Something went wrong\" at Place Order. 87 tickets by 14:30 (normal: ~5/hour).\n- CUST-002: 14 tickets report \"card charged but no order confirmation.\" Support is telling customers duplicate holds drop off in 3-…\n- CUST-003: Promo \"FALL25\" is live today (started 12:00); traffic is ~10% above a normal Wednesday.\n- CUST-004: No reports of issues with search, browsing, or account pages.\n- CUST-005: Top affected regions: all (not region-specific).\n\n### Non-INFO log patterns (numbers masked as N)\n- 17x ERROR checkout-service: \"POST /v1/orders N: orders-service returned N\" 13:59-14:27 e.g. LOG-035, LOG-041, LOG-054\n- 17x ERROR checkout-service: \"POST /v1/orders N: inventory reserve timed out after Nms\" 14:01-14:29 e.g. LOG-042, LOG-043, LOG-049\n- 15x ERROR orders-service: \"FATAL: sorry, too many clients already\" 14:01-14:30 e.g. LOG-040, LOG-059, LOG-060\n- 14x WARN inventory-service: \"slow reservation query (waiting on connection)\" 14:03-14:30 e.g. LOG-047, LOG-051, LOG-068\n- 11x ERROR orders-service: \"HikariPool-N - Connection is not available, request timed out after Nms\" 14:00-14:21 e.g. LOG-037, LOG-053, LOG-064\n- 6x WARN checkout-service: \"retrying payments authorize after timeout (attempt N/N)\" 14:00-14:30 e.g. LOG-036, LOG-045, LOG-050\n- 2x WARN search-service: \"readiness probe failed: context deadline exceeded\" 13:44-14:09 e.g. LOG-014, LOG-066\n- 2x LOG orders-db: \"connections: inventory_svc=N orders_svc=N reporting_svc=N superuser=N total=N/N\" 14:11-14:24 e.g. LOG-076, LOG-121\n- 1x WARN log-host-03: \"disk usage N% on /var/log, rotation scheduled N:N\" 13:31-13:31 e.g. LOG-002\n- 1x WARN payments-service: \"3DS2 challenge config missing for merchant region APAC, falling back to frictionless\" 13:41-13:41 e.g. LOG-012\n- 1x WARN orders-service: \"acquire connection took Nms\" 13:56-13:56 e.g. LOG-032\n- 1x ERROR orders-service: \"FATAL: remaining connection slots are reserved for non-replication superuser connections\" 13:57-13:57 e.g. LOG-033\n- 1x WARN inventory-service: \"slow reservation query Nms (waiting on lock/connection)\" 13:58-13:58 e.g. LOG-034\n- 1x WARN payments-service: \"inbound request queue depth N (client checkout-service retries)\" 14:03-14:03 e.g. LOG-046\n- 1x WARN log-host-03: \"disk usage N% on /var/log\" 14:26-14:26 e.g. LOG-126\n\nYou have at most 10 turns and 90 seconds. Investigate, write the brief with update_investigation, then call finalize."
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01H7Hf6zMPXbjGT4x9b36qoE",
+          "name": "get_service_context",
+          "input": {
+            "service": "orders-db"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01Xu9X7Ti3zfcKhQaSWdkg5D",
+          "name": "search_logs",
+          "input": {
+            "service": "orders-db",
+            "level": "LOG"
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01H7Hf6zMPXbjGT4x9b36qoE",
+          "content": "{\"name\":\"orders-db\",\"type\":\"postgres\",\"version\":\"15\",\"max_connections\":400,\"reserved_superuser_connections\":3,\"shared_by\":[\"inventory-service\",\"orders-service\",\"reporting-service\"],\"notes\":\"No connection pooler (PgBouncer) in front. Action item from INC-2041 still open.\",\"dependsOn\":[],\"dependedOnBy\":[\"inventory-service\",\"checkout-service\",\"web-frontend\",\"orders-service\",\"reporting-service\"],\"sharedResources\":[{\"resource\":\"orders-db\",\"maxConnections\":400,\"reservedSuperuser\":3,\"notes\":\"No connection pooler (PgBouncer) in front. Action item from INC-2041 still open.\",\"rows\":[{\"service\":\"inventory-service\",\"replicas\":6,\"defaultPool\":20,\"effectivePool\":80,\"overrideFrom\":\"CFG-502\",\"defaultBudget\":120,\"effectiveBudget\":480},{\"service\":\"orders-service\",\"replicas\":4,\"defaultPool\":25,\"effectivePool\":25,\"defaultBudget\":100,\"effectiveBudget\":100},{\"service\":\"reporting-service\",\"replicas\":2,\"defaultPool\":15,\"effectivePool\":15,\"defaultBudget\":30,\"effectiveBudget\":30}],\"defaultTotal\":250,\"effectiveTotal\":610,\"overCommitted\":true}]}"
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01Xu9X7Ti3zfcKhQaSWdkg5D",
+          "content": "{\"total\":2,\"returned\":2,\"lines\":[{\"id\":\"LOG-076\",\"timestamp\":\"2026-10-28T14:11:00Z\",\"service\":\"orders-db\",\"level\":\"LOG\",\"message\":\"connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400\",\"source\":\"pg_stat_activity snapshot\"},{\"id\":\"LOG-121\",\"timestamp\":\"2026-10-28T14:24:30Z\",\"service\":\"orders-db\",\"level\":\"LOG\",\"message\":\"connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400\",\"source\":\"pg_stat_activity snapshot\"}]}"
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "toolu_01TEZWnJTKxzUqY2BuutT1rd",
+          "name": "update_investigation",
+          "input": {
+            "summary": "Likely cause: CFG-502 raised inventory-service DB_POOL_MAX 20->80 (6 replicas, budget 120->480) at 13:52, exhausting orders-db's 400 connections. Inventory holds ~318 connections (LOG-076); orders-service gets \"too many clients\" (LOG-040) and checkout fails. Payments rollback and retry flag change were not the fix.",
+            "hypotheses": [
+              {
+                "id": "H1",
+                "statement": "inventory-service DB_POOL_MAX 20->80 (CFG-502) over-committed orders-db connections (no pooler), starving orders-service and causing checkout errors",
+                "confidence": 0.85,
+                "status": "active",
+                "supporting": [
+                  "CFG-502",
+                  "LOG-076",
+                  "LOG-121",
+                  "LOG-040",
+                  "LOG-033",
+                  "MET-orders_db.active_connections",
+                  "MET-inventory.db_pool_in_use"
+                ],
+                "contradicting": [],
+                "reasoning": "Metrics moved at 13:55 right after CFG-502; inventory holds ~318 of 400 connections; orders-service errors are connection-slot failures. Payments rollback (DEP-103) did not clear checkout 5xx (ALR-014)."
+              },
+              {
+                "id": "H2",
+                "statement": "payments-service v2.14.0 caused the incident",
+                "confidence": 0.07,
+                "status": "rejected",
+                "supporting": [
+                  "DEP-102"
+                ],
+                "contradicting": [
+                  "ALR-014",
+                  "LOG-040"
+                ],
+                "reasoning": "Payments latency is a retry-amplification symptom; the rollback did not fix checkout errors."
+              }
+            ],
+            "contributingFactors": [
+              {
+                "factor": "No pooler on orders-db; INC-2041 action item still open",
+                "evidence": [
+                  "LOG-076"
+                ]
+              },
+              {
+                "factor": "Config changes not on deploy dashboard",
+                "evidence": [
+                  "CFG-502"
+                ]
+              },
+              {
+                "factor": "Reporting rollup job added load",
+                "evidence": [
+                  "CFG-503"
+                ]
+              }
+            ],
+            "impact": "From 13:55, checkout error rate peaked at 7.9% and orders errors at 10.3%. CUST-001: 87 tickets by 14:30. CUST-002: 14 reports of card charged with no order confirmation, so there is a payment integrity risk.",
+            "nextActions": [
+              {
+                "action": "Revert inventory-service DB_POOL_MAX to 20",
+                "type": "config_revert",
+                "owner": "inventory-service on-call",
+                "evidence": [
+                  "CFG-502"
+                ]
+              },
+              {
+                "action": "Reconcile charged-without-order cases and release duplicate holds",
+                "type": "investigate",
+                "owner": "payments/checkout on-call",
+                "evidence": [
+                  "CUST-002"
+                ]
+              },
+              {
+                "action": "Deploy PgBouncer and add a connection-budget guardrail on pool changes",
+                "type": "prevention",
+                "owner": "DBA/platform",
+                "evidence": [
+                  "LOG-076"
+                ],
+                "phase": "prevention",
+                "priority": "P1"
+              }
+            ],
+            "openQuestions": [
+              "Did the inventory owner intend CFG-502, and why? Ask the inventory-service on-call.",
+              "How many charged-without-order cases exist? Ask the payments team."
+            ],
+            "stakeholderUpdate": "Some customers are seeing errors when placing orders, and some have been charged without getting a confirmation. The likely cause is a recent setting change that let one service use too many database connections, which starved checkout. We are reverting that setting and will reconcile affected payments. Next update in 30 minutes."
+          },
+          "caller": {
+            "type": "direct"
+          }
+        },
+        {
+          "type": "tool_use",
+          "id": "toolu_01EAernMSrVP4nivnxM1QLHJ",
+          "name": "finalize",
+          "input": {
+            "rationale": "Cause is well supported by the connection budget and snapshots."
+          },
+          "caller": {
+            "type": "direct"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01TEZWnJTKxzUqY2BuutT1rd",
+          "content": "{\"ok\":true,\"updated\":[\"summary\",\"impact\",\"hypotheses\",\"openQuestions\",\"nextActions\",\"contributingFactors\",\"stakeholderUpdate\"],\"policyAdjustments\":[\"nextActions[2]: split into 2 actions so each gets its own risk\"],\"hypotheses\":[\"H1 active 0.85\",\"H2 rejected 0.07\"],\"nextActions\":[\"[now] [low risk: rubric: config revert = low] Revert inventory-service DB_POOL_MAX to 20\",\"[now] [low risk: rubric: investigate = low] Reconcile charged-without-order cases and release duplicate holds\",\"[prevention] [low risk: not risk-rated: planned post-incident work] Deploy PgBouncer\",\"[prevention] [low risk: not risk-rated: planned post-incident work] Add a connection-budget guardrail on pool changes\"],\"similarIncidents\":[\"INC-2041 (retrieval): Resembles H1 (active). Orders failing, orders-db connection exhaustion: reporting-service raised its DB pool from 15 to 100 to speed up a quarterly report.\",\"INC-1987 (retrieval): Resembles H2 (rejected). Checkout 500s after payments deploy: payments-service v2.9.0 shipped a serialization bug for a new card-network field.\"],\"repeatIncident\":\"INC-2041 had the same failure; open action items: Add PgBouncer in front of orders-db; Config-service guardrail on pool sizes\",\"contributingFactors\":[\"(agent) Reporting rollup job added load\",\"(code) Safeguard still missing: \\\"Add PgBouncer in front of orders-db\\\" was an action item from INC-2041 and is still open.\",\"(code) Safeguard still missing: \\\"Config-service guardrail on pool sizes\\\" was an action item from INC-2041 and is still open.\",\"(code) CFG-502 was a hot-reloaded config change (inventory-service) that does not appear on the deploy dashboard, so a deploy-focused search misses it; INC-2041 hit the same visibility gap.\"],\"noise\":\"code-flagged noise is always included: ALR-001, ALR-002, ALR-003, ALR-011, ALR-013. Use notNoise (with a reason) to keep one as signal.\"}"
+        },
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01EAernMSrVP4nivnxM1QLHJ",
+          "content": "{\"ok\":true}"
+        }
+      ]
+    }
+  ],
+  "userEvidence": []
+}

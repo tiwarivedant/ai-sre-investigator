@@ -57,6 +57,9 @@ export const InvestigationUpdateSchema = z
         }),
       )
       .describe("Concrete, ordered actions with owner (team/on-call from the service catalog), one operation per action. Risk is assigned by code from the type."),
+    otherActiveIssues: z
+      .array(z.object({ title: z.string(), evidence: evidenceIds.min(1), relationship: z.string().describe('How it relates to the reported symptom, e.g. "unknown", "possibly related: ..."') }))
+      .describe("Other incidents visible in the data that are NOT what was reported. Use this instead of answering with them. Only needed when the reported symptom is not covered."),
     completedActions: z
       .array(z.object({ action: z.string(), evidence: evidenceIds.min(1) }))
       .describe("Next actions that new evidence shows are already done (e.g. a follow-up reports the revert), each with the evidence. They move to a Done list; omit them from nextActions."),

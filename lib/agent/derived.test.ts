@@ -10,10 +10,12 @@ import type { Hypothesis, InvestigationState } from "@/lib/types";
 const beforeFixes = JSON.parse(fs.readFileSync(path.join(process.cwd(), "notes/before-fixes/inv-20261102191424-c914d0.json"), "utf8")).state as InvestigationState;
 const afterFixes = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "testdata/claude-after-fixes-brief.json"), "utf8")) as Partial<InvestigationState>;
 
+const CHECKOUT = "Customers are seeing errors at checkout and the site feels slow.";
+
 /** Live run with two follow-ups (owner confirmation, then recovery after the revert). */
 const run = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "testdata/claude-two-followups-brief.json"), "utf8"));
 function deriveRun(over: Partial<InvestigationState> = {}, extraUserText?: string): InvestigationState {
-  const state = { ...newInvestigationState("x"), ...structuredClone(run), ...over } as InvestigationState;
+  const state = { ...newInvestigationState(CHECKOUT), ...structuredClone(run), ...over } as InvestigationState;
   const ctx = buildContext(state);
   for (const e of run.userEvidence) ctx.store.add(e);
   if (extraUserText) ctx.store.addUserEvidence(extraUserText, "2026-11-02T20:00:00Z");
@@ -27,7 +29,7 @@ const h = (over: Partial<Hypothesis>): Hypothesis => ({
 });
 
 function derive(over: Partial<InvestigationState>) {
-  const state = { ...newInvestigationState("x"), ...over };
+  const state = { ...newInvestigationState(CHECKOUT), ...over };
   const ctx = buildContext(state);
   refreshDerived(state, ctx.pa, ctx.store);
   return state;
@@ -80,11 +82,11 @@ describe("similar incidents and repeat detection", () => {
 
 describe("consistency check", () => {
   it("flags summary text that contradicts hypothesis status", () => {
-    const confirmed = { ...newInvestigationState("x"), hypotheses: [h({ status: "confirmed" as const, supporting: ["CFG-502", "USER-001"] })] };
+    const confirmed = { ...newInvestigationState(CHECKOUT), hypotheses: [h({ status: "confirmed" as const, supporting: ["CFG-502", "USER-001"] })] };
     expect(consistencyIssues({ ...confirmed, summary: "High confidence, not human-confirmed." })).toEqual([
       "summary says the cause is unconfirmed, but H1 is confirmed",
     ]);
-    const active = { ...newInvestigationState("x"), hypotheses: [h({}), h({ id: "H2", status: "rejected" as const, supporting: ["DEP-102"] })] };
+    const active = { ...newInvestigationState(CHECKOUT), hypotheses: [h({}), h({ id: "H2", status: "rejected" as const, supporting: ["DEP-102"] })] };
     expect(consistencyIssues({ ...active, summary: "We have confirmed the cause." })).toEqual(["summary claims confirmation, but no hypothesis is human-confirmed"]);
     expect(consistencyIssues({ ...active, summary: "Errors were caused by DEP-102." })).toEqual([
       "summary attributes the cause to DEP-102, but H2 (which it supports) is rejected",
@@ -295,7 +297,7 @@ describe("impact onset", () => {
 describe("recovery reports (read from the human's words)", () => {
   async function reportsFor(texts: string[]) {
     const { recoveryReports } = await import("./derived");
-    const ctx = buildContext(newInvestigationState("x"));
+    const ctx = buildContext(newInvestigationState(CHECKOUT));
     texts.forEach((t) => ctx.store.addUserEvidence(t));
     return recoveryReports(ctx.store);
   }
@@ -320,7 +322,7 @@ describe("recovery reports (read from the human's words)", () => {
 
   it("lifts the 0.95 cap in the same update that confirms recovery", async () => {
     const { executeTool } = await import("@/lib/tools");
-    const state = newInvestigationState("x");
+    const state = newInvestigationState(CHECKOUT);
     const ctx = buildContext(state);
     for (const e of run.userEvidence) ctx.store.add(e);
     const out = executeTool(
@@ -331,5 +333,71 @@ describe("recovery reports (read from the human's words)", () => {
     expect(out.isError).toBeFalsy();
     expect(state.hypotheses[0].confidence).toBe(0.97);
     expect(state.incidentStatus).toBe("mitigated");
+  });
+});
+
+describe("report the data doesn't cover (Kafka)", () => {
+  const KAFKA = "Kafka consumers are lagging.";
+  // What the failing live run wrote: the checkout incident, as if it were the answer.
+  const checkoutAsAnswer = {
+    summary: "Likely cause: CFG-502 raised inventory-service DB_POOL_MAX 20->80, exhausting orders-db connections.",
+    hypotheses: [h({ confidence: 0.85 }), h({ id: "H2", status: "rejected" as const, supporting: ["DEP-102"], confidence: 0.07 })],
+  };
+
+  function deriveKafka(over: Partial<InvestigationState> = {}, followUp?: string) {
+    const state = { ...newInvestigationState(KAFKA), ...structuredClone(checkoutAsAnswer), ...over };
+    const ctx = buildContext(state);
+    if (followUp) ctx.store.addUserEvidence(followUp);
+    refreshDerived(state, ctx.pa, ctx.store);
+    return state;
+  }
+
+  it("is 'insufficient evidence', with no confident hypothesis", () => {
+    const s = deriveKafka();
+    expect(s.coverage?.verdict).toBe("none");
+    expect(s.incidentStatus).toBe("insufficient-evidence");
+    expect(Math.max(...s.hypotheses.map((x) => x.confidence))).toBeLessThanOrEqual(0.3);
+    expect(s.overallConfidence).toBeLessThanOrEqual(0.3);
+  });
+
+  it("shows the active checkout incident separately, with an unknown relationship", () => {
+    expect(deriveKafka().otherActiveIssues).toEqual([
+      { title: "INC-2213: Checkout errors and slowness reported by customers", evidence: ["ALR-012"], relationship: "relationship to kafka/consumer unknown", source: "code" },
+    ]);
+  });
+
+  it("flags a summary that answers with the other incident instead of the reported symptom", () => {
+    expect(deriveKafka().consistencyIssues?.[0]).toMatch(/summary does not lead with the reported kafka\/consumer symptom/);
+    const honest = deriveKafka({ summary: "No evidence about Kafka in the available data. Separately, checkout is failing (ALR-012)." });
+    expect(honest.consistencyIssues?.some((i) => /does not lead with/.test(i))).toBe(false);
+  });
+
+  it("puts gathering the missing data first, and flags off-topic hypotheses and 'actual incident' wording", () => {
+    const s = deriveKafka({ summary: "No evidence about Kafka in the data. The actual incident (INC-2213) is checkout errors." });
+    expect(s.nextActions[0]).toMatchObject({ phase: "now", source: "code", risk: "low" });
+    expect(s.nextActions[0].action).toMatch(/^Collect consumer lag metrics per consumer group.*from the owners of kafka\/consumer/);
+    expect(s.consistencyIssues).toEqual([
+      "summary calls another incident the actual one; the kafka/consumer report may be right and simply not in this data",
+      "hypotheses H1 are not about the reported kafka/consumer symptom; describe other incidents in otherActiveIssues instead",
+    ]);
+    const onTopic = deriveKafka({
+      summary: "No evidence about Kafka in the available data.",
+      hypotheses: [h({ statement: "Kafka lag is related to the active checkout incident", confidence: 0.2 })],
+    });
+    expect(onTopic.consistencyIssues).toEqual([]);
+  });
+
+  it("lifts the status once a human provides Kafka evidence", () => {
+    const s = deriveKafka({}, "Kafka consumer group orders-events lag is 2M messages; broker-3 logs show ISR shrink.");
+    expect(s.coverage?.verdict).toBe("covered");
+    expect(s.incidentStatus).toBe("investigating");
+  });
+
+  it("leaves the covered checkout report alone", () => {
+    const s = derive({ hypotheses: [h({ confidence: 0.85 })] });
+    expect(s.coverage?.verdict).toBe("covered");
+    expect(s.incidentStatus).toBe("investigating");
+    expect(s.hypotheses[0].confidence).toBe(0.85);
+    expect(s.otherActiveIssues).toEqual([]);
   });
 });

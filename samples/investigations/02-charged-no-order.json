@@ -1,0 +1,622 @@
+{
+  "state": {
+    "id": "sample-02-charged-no-order",
+    "incidentInput": "Support says customers were charged but have no order.",
+    "createdAt": "2026-11-02T20:01:16.001Z",
+    "updatedAt": "2026-11-02T20:01:50.478Z",
+    "status": "complete",
+    "summary": "CFG-502 (inventory DB_POOL_MAX 20->80 at 13:52) overcommitted orders-db (budget 610 vs max 400), exhausting connections (397/400, LOG-076) so orders-service could not create orders after payment authorization. Payments confirms the 14 affected customers have duplicate holds, not completed captures, which auto-release in 3-5 days (USER-001). The cause is still the likely one and not confirmed by the change owner. Recovery not yet verified.",
+    "impact": "Onset 13:55. Checkout 5xx up to 7.9%, orders error up to 10.3%; 87 tickets by 14:30 (CUST-001). 14 customers report being charged with no order (CUST-002); payments confirms these are duplicate holds that auto-release in 3-5 days (USER-001). Customers may see held funds for days. All regions (CUST-005).",
+    "timeline": [
+      {
+        "ts": "2026-10-28T13:40:00Z",
+        "evidenceId": "DEP-102",
+        "note": "Deploy payments-service v2.14.0: Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2",
+        "kind": "ruled-out",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:52:00Z",
+        "evidenceId": "CFG-502",
+        "note": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-inventory.db_pool_in_use",
+        "note": "Rose 78 -> 290 (peak 323)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-orders_db.active_connections",
+        "note": "Rose 244.5 -> 331 (peak 397)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:57:33Z",
+        "evidenceId": "LOG-033",
+        "note": "ERROR orders-service: FATAL: remaining connection slots are reserved for non-replication superuser connections",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:00:00Z",
+        "evidenceId": "MET-payments.p95_latency_ms",
+        "note": "Rose 416.25 -> 640 (peak 650), recovered 14:20",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:01:36Z",
+        "evidenceId": "LOG-040",
+        "note": "ERROR orders-service: FATAL: sorry, too many clients already",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:03:00Z",
+        "evidenceId": "CUST-001",
+        "note": "Spike in \"Something went wrong\" at Place Order. 87 tickets by 14:30 (normal: ~5/hour).",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:11:00Z",
+        "evidenceId": "LOG-076",
+        "note": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:18:00Z",
+        "evidenceId": "DEP-103",
+        "note": "Rollback payments-service v2.13.4: Rollback v2.14.0 during INC-2213 investigation",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:22:00Z",
+        "evidenceId": "ALR-014",
+        "note": "[critical] checkout-service 5xx rate above 2% (still firing after payments rollback) (7.4%)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:24:30Z",
+        "evidenceId": "LOG-121",
+        "note": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-11-02T20:01:41.972Z",
+        "evidenceId": "USER-001",
+        "note": "Follow-up: Payments confirms 14 duplicate holds, auto-release in 3–5 days.",
+        "kind": "follow-up",
+        "source": "code"
+      }
+    ],
+    "keySignals": [
+      {
+        "evidenceId": "CFG-502",
+        "why": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-076",
+        "why": "LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-121",
+        "why": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-033",
+        "why": "ERROR orders-service: FATAL: remaining connection slots are reserved for non-replication superuser connections",
+        "source": "code"
+      },
+      {
+        "evidenceId": "LOG-040",
+        "why": "ERROR orders-service: FATAL: sorry, too many clients already",
+        "source": "code"
+      },
+      {
+        "evidenceId": "MET-orders_db.active_connections",
+        "why": "Rose 244.5 -> 331 (peak 397)",
+        "source": "code"
+      }
+    ],
+    "noise": [
+      {
+        "evidenceId": "ALR-001",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "outside blast radius",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-002",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "not in catalog",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-003",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      },
+      {
+        "evidenceId": "ALR-011",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "info severity"
+        ]
+      },
+      {
+        "evidenceId": "ALR-013",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "CFG-502 raised inventory pool to 80 x6 replicas, exhausting orders-db connections; orders-service failed to create orders after payment auth, leaving holds",
+        "confidence": 0.86,
+        "status": "active",
+        "supporting": [
+          "CFG-502",
+          "LOG-076",
+          "LOG-121",
+          "LOG-033",
+          "LOG-040",
+          "MET-orders_db.active_connections",
+          "MET-inventory.db_pool_in_use",
+          "USER-001"
+        ],
+        "contradicting": [
+          "MET-payments.p95_latency_ms"
+        ],
+        "reasoning": "Timing and connection snapshots fit; USER-001 shows the customer harm is holds from auth without order, consistent with order creation failing. Not human-confirmed."
+      },
+      {
+        "id": "H2",
+        "statement": "Payments v2.14.0 caused the issue",
+        "confidence": 0.05,
+        "status": "rejected",
+        "supporting": [
+          "DEP-102"
+        ],
+        "contradicting": [
+          "DEP-103",
+          "ALR-014"
+        ],
+        "reasoning": "Rollback did not clear errors."
+      }
+    ],
+    "openQuestions": [
+      "Did the inventory owner intend CFG-502, and why?",
+      "Are there other affected customers beyond the 14 reported? (payments/support)",
+      "Can the holds be released early? (payments)"
+    ],
+    "nextActions": [
+      {
+        "action": "Revert inventory-service DB_POOL_MAX to 20",
+        "owner": "inventory-service on-call",
+        "type": "config_revert",
+        "risk": "low",
+        "riskReason": "rubric: config revert = low",
+        "phase": "now",
+        "evidence": [
+          "CFG-502",
+          "LOG-076"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Give support guidance that the 14 holds auto-release in 3-5 days",
+        "owner": "payments on-call / support",
+        "type": "communicate",
+        "risk": "low",
+        "riskReason": "rubric: communicate = low",
+        "phase": "now",
+        "evidence": [
+          "USER-001",
+          "CUST-002"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Ask payments whether to release them early",
+        "owner": "payments on-call / support",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "USER-001",
+          "CUST-002"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Re-enable payments_retry_on_timeout only after recovery verified",
+        "owner": "checkout on-call",
+        "type": "flag_change",
+        "risk": "low",
+        "riskReason": "rubric: flag change = low",
+        "phase": "after_recovery",
+        "evidence": [
+          "CFG-504"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Deploy PgBouncer in front of orders-db",
+        "owner": "platform/DBA",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Add guardrail on pool-size config changes",
+        "owner": "platform",
+        "type": "prevention",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "phase": "prevention",
+        "priority": "P1",
+        "evidence": [
+          "INC-2041",
+          "CFG-502"
+        ],
+        "source": "agent"
+      }
+    ],
+    "stakeholderUpdate": "Some customers saw checkout errors, and 14 reported being charged without an order. Payments confirms these are temporary holds, not completed charges, and they release automatically in 3-5 days. The likely cause is a settings change that let one service use too many database connections, blocking order creation. We are reverting that setting. Next update in 30 minutes.",
+    "overallConfidence": 0.86,
+    "trace": [
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "get_service_context",
+        "args": {
+          "service": "orders-db"
+        },
+        "resultSummary": "orders-db: orders-db budget 610/400",
+        "ms": 2241
+      },
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "search_logs",
+        "args": {
+          "service": "orders-db",
+          "level": "LOG"
+        },
+        "resultSummary": "2/2 log lines",
+        "ms": 1
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "CFG-502 (inventory DB_POOL_MAX 20->80 at 13:52) overcommitted orders-db (effective budget 610 vs max 400), exhausting connections (397/400, LOG-076). orders-service can't get connections, so orders fail after payment is authorized: charged but no order (CUST-002). Likely cause, not human-confirmed.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 raised inventory pool to 80 x6 replicas, exhausting orders-db connections; orders-service fails to write orders after payment, causing charged-without-order",
+              "confidence": 0.85,
+              "status": "active",
+              "supporting": [
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "LOG-033",
+                "LOG-040",
+                "MET-orders_db.active_connections",
+                "MET-inventory.db_pool_in_use"
+              ],
+              "contradicting": [
+                "MET-payments.p95_latency_ms"
+              ],
+              "reasoning": "Onset 13:55 right after CFG-502; inventory holds 318 of 397 connections; orders-service gets 'too many clients'. Payments rollback and retry flag off did not fix (ALR-014). Payments latency, reporting CPU are secondary/noise."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the issue",
+              "confidence": 0.08,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014"
+              ],
+              "reasoning": "Payments error rate unchanged; rollback did not clear checkout errors."
+            }
+          ],
+          "impact": "Onset 13:55. Checkout 5xx up to 7.9%, orders error up to 10.3%; 87 tickets by 14:30 (CUST-001); 14 report charged without order (CUST-002). All regions (CUST-005).",
+          "nextActions": [
+            {
+              "action": "Revert inventory-service DB_POOL_MAX to 20",
+              "type": "config_revert",
+              "owner": "inventory-service on-call",
+              "evidence": [
+                "CFG-502",
+                "LOG-076"
+              ]
+            },
+            {
+              "action": "Reconcile charged-without-order payments; void/refund auths or create orders",
+              "type": "investigate",
+              "owner": "payments/orders on-call",
+              "evidence": [
+                "CUST-002"
+              ]
+            },
+            {
+              "action": "Deploy PgBouncer and add connection-budget guardrail on pool changes",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform/DBA",
+              "evidence": [
+                "INC-2041"
+              ]
+            },
+            {
+              "action": "Re-enable payments_retry_on_timeout only after recovery verified",
+              "type": "flag_change",
+              "phase": "after_recovery",
+              "owner": "checkout on-call",
+              "evidence": [
+                "CFG-504"
+              ]
+            }
+          ],
+          "openQuestions": [
+            "Did the inventory owner intend CFG-502, and why?",
+            "How many customers were charged without orders? (payments/support)"
+          ],
+          "stakeholderUpdate": "Some customers see errors at checkout, and some were charged without getting an order. The likely cause is a recent setting change that let one service use too many database connections, which starved order creation. We are reverting that setting and will reconcile affected payments. Next update in 30 minutes."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, nextActions, stakeholderUpdate · policy: nextActions[1]: split into 2 actions so each gets its own risk; nextActions[2]: split into 2 actions so each gets its own risk",
+        "ms": 8544
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "Cause well supported by pool budget and connection snapshots."
+        },
+        "resultSummary": "finalized: Cause well supported by pool budget and connection snapshots.",
+        "ms": 2
+      },
+      {
+        "step": 3,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "CFG-502 (inventory DB_POOL_MAX 20->80 at 13:52) overcommitted orders-db (budget 610 vs max 400), exhausting connections (397/400, LOG-076) so orders-service could not create orders after payment authorization. Payments confirms the 14 affected customers have duplicate holds, not completed captures, which auto-release in 3-5 days (USER-001). The cause is still the likely one and not confirmed by the change owner. Recovery not yet verified.",
+          "impact": "Onset 13:55. Checkout 5xx up to 7.9%, orders error up to 10.3%; 87 tickets by 14:30 (CUST-001). 14 customers report being charged with no order (CUST-002); payments confirms these are duplicate holds that auto-release in 3-5 days (USER-001). Customers may see held funds for days. All regions (CUST-005).",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "CFG-502 raised inventory pool to 80 x6 replicas, exhausting orders-db connections; orders-service failed to create orders after payment auth, leaving holds",
+              "confidence": 0.86,
+              "status": "active",
+              "supporting": [
+                "CFG-502",
+                "LOG-076",
+                "LOG-121",
+                "LOG-033",
+                "LOG-040",
+                "MET-orders_db.active_connections",
+                "MET-inventory.db_pool_in_use",
+                "USER-001"
+              ],
+              "contradicting": [
+                "MET-payments.p95_latency_ms"
+              ],
+              "reasoning": "Timing and connection snapshots fit; USER-001 shows the customer harm is holds from auth without order, consistent with order creation failing. Not human-confirmed."
+            },
+            {
+              "id": "H2",
+              "statement": "Payments v2.14.0 caused the issue",
+              "confidence": 0.05,
+              "status": "rejected",
+              "supporting": [
+                "DEP-102"
+              ],
+              "contradicting": [
+                "DEP-103",
+                "ALR-014"
+              ],
+              "reasoning": "Rollback did not clear errors."
+            }
+          ],
+          "nextActions": [
+            {
+              "action": "Revert inventory-service DB_POOL_MAX to 20",
+              "type": "config_revert",
+              "owner": "inventory-service on-call",
+              "evidence": [
+                "CFG-502",
+                "LOG-076"
+              ]
+            },
+            {
+              "action": "Give support guidance that the 14 holds auto-release in 3-5 days and ask payments whether to release them early",
+              "type": "communicate",
+              "owner": "payments on-call / support",
+              "evidence": [
+                "USER-001",
+                "CUST-002"
+              ]
+            },
+            {
+              "action": "Re-enable payments_retry_on_timeout only after recovery verified",
+              "type": "flag_change",
+              "phase": "after_recovery",
+              "owner": "checkout on-call",
+              "evidence": [
+                "CFG-504"
+              ]
+            },
+            {
+              "action": "Deploy PgBouncer in front of orders-db",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform/DBA",
+              "evidence": [
+                "INC-2041"
+              ]
+            },
+            {
+              "action": "Add guardrail on pool-size config changes",
+              "type": "prevention",
+              "priority": "P1",
+              "owner": "platform",
+              "evidence": [
+                "CFG-502"
+              ]
+            }
+          ],
+          "openQuestions": [
+            "Did the inventory owner intend CFG-502, and why?",
+            "Are there other affected customers beyond the 14 reported? (payments/support)",
+            "Can the holds be released early? (payments)"
+          ],
+          "stakeholderUpdate": "Some customers saw checkout errors, and 14 reported being charged without an order. Payments confirms these are temporary holds, not completed charges, and they release automatically in 3-5 days. The likely cause is a settings change that let one service use too many database connections, blocking order creation. We are reverting that setting. Next update in 30 minutes."
+        },
+        "resultSummary": "updated summary, impact, hypotheses, openQuestions, nextActions, stakeholderUpdate · policy: nextActions[1]: split into 2 actions so each gets its own risk",
+        "ms": 8496
+      },
+      {
+        "step": 3,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "Brief updated with the payments confirmation; the cause remains likely but unconfirmed."
+        },
+        "resultSummary": "finalized: Brief updated with the payments confirmation; the cause remains likely but unconfirmed.",
+        "ms": 3
+      }
+    ],
+    "revisions": [
+      {
+        "at": "2026-11-02T20:01:50.480Z",
+        "trigger": "follow-up USER-001: Payments confirms 14 duplicate holds, auto-release in 3–5 days.",
+        "changes": [
+          "H1 confidence 85% -> 86%",
+          "H1 new supporting evidence: USER-001",
+          "H2 confidence 8% -> 5%",
+          "overall confidence 85% -> 86%",
+          "open questions: 1 resolved, 2 new",
+          "4 new next actions"
+        ]
+      }
+    ],
+    "groundingIssues": [],
+    "briefSource": "agent",
+    "similarIncidents": [
+      {
+        "incidentId": "INC-2041",
+        "hypothesisId": "H1",
+        "similarity": "Resembles H1 (active). Orders failing, orders-db connection exhaustion: reporting-service raised its DB pool from 15 to 100 to speed up a quarterly report.",
+        "lesson": "30 minutes lost investigating the most recent deploy rather than recent config changes.",
+        "source": "retrieval"
+      },
+      {
+        "incidentId": "INC-1987",
+        "hypothesisId": "H2",
+        "similarity": "Resembles H2 (rejected). Checkout 500s after payments deploy: payments-service v2.9.0 shipped a serialization bug for a new card-network field.",
+        "lesson": "payments-service's own error rate jumped from 0.2% to 12% within 2 minutes of the 100% rollout.",
+        "source": "retrieval"
+      }
+    ],
+    "repeatIncident": {
+      "incidentId": "INC-2041",
+      "hypothesisId": "H1",
+      "openActionItems": [
+        "Add PgBouncer in front of orders-db",
+        "Config-service guardrail on pool sizes"
+      ]
+    },
+    "contributingFactors": [
+      {
+        "factor": "Safeguard still missing: \"Add PgBouncer in front of orders-db\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "Safeguard still missing: \"Config-service guardrail on pool sizes\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "CFG-502 was a hot-reloaded config change (inventory-service) that does not appear on the deploy dashboard, so a deploy-focused search misses it; INC-2041 hit the same visibility gap.",
+        "evidence": [
+          "CFG-502",
+          "INC-2041"
+        ],
+        "source": "code"
+      }
+    ],
+    "incidentStatus": "investigating",
+    "doneActions": [],
+    "unexplained": [],
+    "consistencyIssues": []
+  },
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "history": [],
+  "userEvidence": [
+    {
+      "id": "USER-001",
+      "kind": "user",
+      "timestamp": "2026-11-02T20:01:41.972Z",
+      "title": "Payments confirms 14 duplicate holds, auto-release in 3–5 days.",
+      "raw": {
+        "text": "Payments confirms 14 duplicate holds, auto-release in 3–5 days."
+      }
+    }
+  ],
+  "sample": true,
+  "recordedFrom": "anthropic/claude-sonnet-5-5"
+}

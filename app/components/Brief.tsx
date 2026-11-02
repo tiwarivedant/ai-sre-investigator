@@ -5,6 +5,7 @@ import type { Hypothesis, InvestigationState, NextAction } from "@/lib/types";
 import { briefToMarkdown } from "@/lib/brief/markdown";
 import { revisionLabel } from "@/lib/text";
 import { IncidentChart, useChartData } from "./IncidentChart";
+import { whatToProvide, type Coverage } from "@/lib/analysis/coverage";
 import { Chips, confidenceWord, ConfidenceBar, EvidenceChip, HypothesisStatus, RichText, RiskBadge, RunStatus, Section } from "./ui";
 
 export function Brief({ state, changed, onQuestion }: { state: InvestigationState; changed: Set<string>; onQuestion: (q: string) => void }) {
@@ -17,7 +18,20 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
 
   return (
     <div className="space-y-3">
+      {state.coverage && <CoverageAnswer coverage={state.coverage} />}
+      {(state.otherActiveIssues?.length ?? 0) > 0 && <OtherActiveIssues issues={state.otherActiveIssues!} />}
       {state.briefSource !== "pre-analysis" && <StatusStepper state={state} />}
+      {(state.ignoredFollowUps?.length ?? 0) > 0 && (
+        <div role="note" className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-md border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-400">
+          <span className="font-semibold tracking-wider text-zinc-300 uppercase">Ignored follow-up{state.ignoredFollowUps!.length > 1 ? "s" : ""}</span>
+          {state.ignoredFollowUps!.map((f) => (
+            <span key={f.evidenceId} className="min-w-0" title={f.text}>
+              <EvidenceChip id={f.evidenceId} variant="inline" /> instruction-like text, not treated as evidence: &ldquo;
+              {f.text.length > 70 ? `${f.text.slice(0, 69)}…` : f.text}&rdquo;
+            </span>
+          ))}
+        </div>
+      )}
       <Verdict state={state} />
 
       {(state.consistencyIssues?.length ?? 0) > 0 && state.status !== "running" && (
@@ -347,6 +361,60 @@ function RejectedCard({ h, rank, highlight }: { h: Hypothesis; rank: number; hig
   );
 }
 
+const SOURCE_LABEL: Record<string, string> = { catalog: "service catalog", alerts: "alerts", logs: "logs", metrics: "metrics", changes: "changes", "follow-ups": "follow-ups" };
+
+/** The answer to "does the data even cover this?", before anything else. */
+function CoverageAnswer({ coverage }: { coverage: Coverage }) {
+  const found = coverage.terms.filter((t) => t.covered && t.kind === "component");
+  const searched = coverage.searched.map((s) => SOURCE_LABEL[s] ?? s).join(", ");
+  if (coverage.verdict === "covered") {
+    return (
+      <p className="px-1 text-xs text-zinc-500">
+        <span className="font-semibold tracking-wider text-zinc-400 uppercase">Coverage</span>{" "}
+        Reported {found.length ? found.map((t) => t.term.replace(/-service$/, "")).join(", ") : "symptoms"} found in the data (
+        {[...new Set(coverage.terms.flatMap((t) => Object.keys(t.hits)))].map((s) => SOURCE_LABEL[s] ?? s).join(", ")}).
+      </p>
+    );
+  }
+  const name = (t: string) => (t === "kafka" ? "Kafka" : t);
+  return (
+    <section className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+      <h2 className="text-[11px] font-semibold tracking-wider text-amber-300 uppercase">Answer</h2>
+      <p className="mt-1 text-sm text-zinc-100">
+        {coverage.verdict === "none" ? "No evidence" : "Partial evidence: nothing"} about{" "}
+        <span className="font-semibold">{coverage.uncovered.map(name).join(", ")}</span> in the available data (searched {searched}).
+        {found.length > 0 && <> Evidence covers {found.map((t) => t.term.replace(/-service$/, "")).join(", ")}.</>}
+      </p>
+      <ul className="mt-2 space-y-1 text-sm text-zinc-300">
+        {[...new Set(coverage.uncovered.map((t) => whatToProvide(t)))].map((need, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="text-amber-300/80">→</span>
+            <span>To investigate, provide {need}.</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** Other incidents in the data: shown, clearly not as the answer. */
+function OtherActiveIssues({ issues }: { issues: NonNullable<InvestigationState["otherActiveIssues"]> }) {
+  return (
+    <section className="rounded-lg border border-zinc-700 bg-zinc-900/40 px-4 py-3">
+      <h2 className="text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">Other active incident{issues.length > 1 ? "s" : ""}</h2>
+      <ul className="mt-1.5 space-y-1.5">
+        {issues.map((o) => (
+          <li key={o.title} className="flex flex-wrap items-baseline gap-2 text-sm">
+            <span className="text-zinc-200"><RichText text={o.title} /></span>
+            <Chips ids={o.evidence} />
+            <span className="text-xs text-zinc-500 italic">{o.relationship}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 const STEPS: { key: NonNullable<InvestigationState["incidentStatus"]>; label: string; criterion: string }[] = [
   { key: "investigating", label: "Investigating", criterion: "Gathering evidence; cause not yet confirmed by a human" },
   { key: "identified", label: "Identified", criterion: "A human confirmed the cause" },
@@ -356,7 +424,8 @@ const STEPS: { key: NonNullable<InvestigationState["incidentStatus"]>; label: st
 
 /** Incident lifecycle, derived only from human evidence; reached steps show what got them there. */
 function StatusStepper({ state }: { state: InvestigationState }) {
-  const current = STEPS.findIndex((st) => st.key === (state.incidentStatus ?? "investigating"));
+  const insufficient = state.incidentStatus === "insufficient-evidence";
+  const current = insufficient ? 0 : STEPS.findIndex((st) => st.key === (state.incidentStatus ?? "investigating"));
   const lead = state.hypotheses.find((h) => h.status !== "rejected");
   const proof: Record<string, string[]> = {
     identified: (lead?.supporting ?? []).filter((id) => id.startsWith("USER-")).slice(0, 1),
@@ -375,16 +444,20 @@ function StatusStepper({ state }: { state: InvestigationState }) {
               <div className="flex items-center gap-1.5">
                 <span
                   className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
-                    active
+                    insufficient && i === 0
+                      ? "border-amber-400/60 bg-amber-500/15 text-amber-200"
+                      : active
                       ? "border-sky-300 bg-sky-400/20 text-sky-100"
                       : done
                         ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
                         : "border-zinc-700 text-zinc-600"
                   }`}
                 >
-                  {done ? "✓" : i + 1}
+                  {insufficient && i === 0 ? "!" : done ? "✓" : i + 1}
                 </span>
-                <span className={`text-xs font-medium whitespace-nowrap ${active ? "text-zinc-50" : done ? "text-zinc-300" : "text-zinc-600"}`}>{st.label}</span>
+                <span className={`text-xs font-medium whitespace-nowrap ${insufficient && i === 0 ? "text-amber-200" : active ? "text-zinc-50" : done ? "text-zinc-300" : "text-zinc-600"}`}>
+                  {insufficient && i === 0 ? "Insufficient evidence" : st.label}
+                </span>
               </div>
               {(done || active) && proof[st.key]?.length ? (
                 <span className="mt-0.5 ml-6 text-[10px] text-zinc-500">
@@ -421,7 +494,21 @@ function Verdict({ state }: { state: InvestigationState }) {
         </div>
       </header>
       <div className="px-4 py-3">
-        {preAnalysis || !lead ? (
+        {state.incidentStatus === "insufficient-evidence" ? (
+          <>
+            <div className="text-[11px] font-semibold tracking-wider text-amber-300/90 uppercase">Insufficient evidence</div>
+            <p className="mt-1 text-base leading-snug font-semibold text-zinc-50">
+              The available data has nothing about {state.coverage?.uncovered.join(", ") || "the reported symptom"}, so there is no supported cause yet.
+            </p>
+            {action && (
+              <div className="mt-3 flex flex-wrap items-baseline gap-2 border-t border-zinc-800 pt-2.5 text-sm">
+                <span className="text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Do now</span>
+                <RiskBadge risk={action.risk} reason={action.riskReason} />
+                <span className="min-w-0 flex-1 text-zinc-200"><RichText text={action.action} /></span>
+              </div>
+            )}
+          </>
+        ) : preAnalysis || !lead ? (
           <p className="text-sm text-zinc-400">
             {state.status === "running" ? "Investigating. The verdict appears once the agent writes its first brief." : "No verdict: the agent did not reach a hypothesis."}
           </p>

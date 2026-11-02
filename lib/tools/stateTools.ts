@@ -3,6 +3,8 @@ import { InvestigationUpdateSchema } from "@/lib/agent/schemas";
 import { checkGrounding, stripUnknown } from "@/lib/agent/grounding";
 import { applyPolicy, missingOpenQuestions } from "@/lib/agent/policy";
 import { attachRecovery, recoveryReports, refreshDerived } from "@/lib/agent/derived";
+import { followUpClasses } from "@/lib/analysis/followups";
+import type { InvestigationUpdate } from "@/lib/agent/schemas";
 import type { Hypothesis, InvestigationState, NextAction } from "@/lib/types";
 import { defineTool, type ToolContext } from "./types";
 
@@ -33,6 +35,8 @@ export const updateInvestigation = defineTool({
       ctx.state.groundingIssues.push(...report.locations.map((l) => `stripped unverified citation (${l})`));
     }
 
+    const followUpNotes: string[] = [];
+    update = screenFollowUps(update, ctx, followUpNotes);
     if (update.hypotheses) update = { ...update, hypotheses: attachRecovery(update.hypotheses, recoveryReports(ctx.store)) };
     const policy = applyPolicy(update, ctx.pa.changes, ctx.state.hypotheses);
     applyUpdate(ctx.state, policy.update, policy.nextActions);
@@ -46,7 +50,7 @@ export const updateInvestigation = defineTool({
         ok: true,
         updated: fields,
         stripped: report.unknownIds.length ? report.unknownIds : undefined,
-        policyAdjustments: policy.adjustments.length ? policy.adjustments : undefined,
+        policyAdjustments: [...followUpNotes, ...policy.adjustments].length ? [...followUpNotes, ...policy.adjustments] : undefined,
         hypotheses: ctx.state.hypotheses.map((h) => `${h.id} ${h.status} ${h.confidence}`),
         nextActions: policy.nextActions?.map((a) => `[${a.phase}] [${a.risk} risk: ${a.riskReason}] ${a.action}`),
         similarIncidents: ctx.state.similarIncidents?.map((x) => `${x.incidentId} (${x.source}): ${x.similarity}`),
@@ -65,12 +69,16 @@ export const updateInvestigation = defineTool({
         impactHint: impactMissesCustomers
           ? `Impact cites no customer notes, but support notes exist: ${customerIds(ctx).join(", ")}. Add what customers experience (ticket volume, errors seen, payment/order integrity concerns), citing them.`
           : undefined,
+        coverage:
+          ctx.state.coverage && ctx.state.coverage.verdict !== "covered"
+            ? `The report names ${ctx.state.coverage.uncovered.join(", ") || "things"} with no evidence in the data. Your summary must say so first; hypotheses are capped at 0.3 while nothing covers the reported symptom. Put other incidents in otherActiveIssues.`
+            : undefined,
         mustRewrite: ctx.mustRewrite?.size ? `Before finalize, rewrite: ${[...ctx.mustRewrite].join(", ")}` : undefined,
       },
       summary:
         `updated ${fields.join(", ")}` +
         `${report.unknownIds.length ? ` (stripped ${report.unknownIds.join(", ")})` : ""}` +
-        `${policy.adjustments.length ? ` · policy: ${policy.adjustments.join("; ")}` : ""}`,
+        `${[...followUpNotes, ...policy.adjustments].length ? ` · policy: ${[...followUpNotes, ...policy.adjustments].join("; ")}` : ""}`,
     };
   },
 });
@@ -84,6 +92,7 @@ export function applyUpdate(state: InvestigationState, update: z.infer<typeof In
     noise: agentNoise,
     keySignals: _ks,
     completedActions,
+    otherActiveIssues: agentOther,
     ...rest
   } = update;
   Object.assign(state, rest);
@@ -98,6 +107,7 @@ export function applyUpdate(state: InvestigationState, update: z.infer<typeof In
   if (update.keySignals) state.keySignals = update.keySignals.length ? update.keySignals.map((k) => ({ ...k, source: "agent" as const })) : state.keySignals;
   if (agentSimilar) state.similarIncidents = agentSimilar.map((x) => ({ ...x, source: "agent" as const }));
   if (agentFactors) state.contributingFactors = agentFactors.map((f) => ({ ...f, source: "agent" as const }));
+  if (agentOther) state.otherActiveIssues = agentOther.map((o) => ({ ...o, source: "agent" as const }));
   if (completedActions?.length) {
     const done = state.doneActions ?? [];
     for (const c of completedActions) if (!done.some((d) => d.action === c.action)) done.push({ ...c, source: "agent" });
@@ -172,4 +182,42 @@ const customerIds = (ctx: ToolContext) =>
 /** Customer notes exist but the Impact section cites none of them. */
 function missesCustomerNotes(ctx: ToolContext): boolean {
   return !!ctx.state.impact && customerIds(ctx).length > 0 && !/\bCUST-\d+/.test(ctx.state.impact);
+}
+
+/**
+ * Follow-ups that are claims or instructions are not evidence: their IDs are removed
+ * from hypotheses and key signals. After such a follow-up, hypothesis confidence is
+ * restored to its pre-follow-up value unless the hypothesis gained real (non-follow-up)
+ * evidence in this update.
+ */
+function screenFollowUps(update: InvestigationUpdate, ctx: ToolContext, notes: string[]): InvestigationUpdate {
+  const classes = followUpClasses(ctx.store);
+  const notEvidence = new Set([...classes].filter(([, c]) => c.kind !== "evidence").map(([id]) => id));
+  const out: InvestigationUpdate = { ...update };
+  const drop = (ids: string[], where: string) => {
+    const removed = ids.filter((id) => notEvidence.has(id));
+    for (const id of removed) notes.push(`${id} removed from ${where}: it is ${classes.get(id)!.kind === "instruction" ? "an instruction, ignored" : "an unsupported claim, not evidence"}`);
+    return ids.filter((id) => !notEvidence.has(id));
+  };
+  if (out.hypotheses) {
+    out.hypotheses = out.hypotheses.map((h) => {
+      const next = {
+        ...h,
+        supporting: drop(h.supporting, `${h.id}.supporting`),
+        contradicting: drop(h.contradicting, `${h.id}.contradicting`),
+        recoveryEvidence: h.recoveryEvidence ? drop(h.recoveryEvidence, `${h.id}.recoveryEvidence`) : undefined,
+      };
+      const before = ctx.baselineConfidence?.get(h.id);
+      if (before && (ctx.followUpKind === "claim" || ctx.followUpKind === "instruction") && next.confidence !== before.confidence) {
+        const gained = [...next.supporting, ...next.contradicting].filter((id) => !id.startsWith("USER-") && !before.evidence.includes(id));
+        if (!gained.length) {
+          notes.push(`${h.id} confidence kept at ${before.confidence} (was set to ${next.confidence}): a ${ctx.followUpKind} follow-up does not move confidence`);
+          next.confidence = before.confidence;
+        }
+      }
+      return next;
+    });
+  }
+  if (out.keySignals) out.keySignals = out.keySignals.filter((k) => !notEvidence.has(k.evidenceId));
+  return out;
 }

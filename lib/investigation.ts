@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { loadEvidenceStore } from "@/lib/evidence/loader";
 import { formatPreAnalysis, runPreAnalysis } from "@/lib/analysis/preAnalysis";
+import { checkCoverage, formatCoverage } from "@/lib/analysis/coverage";
+import { classifyFollowUp } from "@/lib/analysis/followups";
 import { Bm25Index } from "@/lib/retrieval/bm25";
 import { runAgent, type AgentEvent, type AgentRunOptions } from "@/lib/agent/loop";
 import { followUpMessage, initialUserMessage, SYSTEM_PROMPT } from "@/lib/agent/prompt";
@@ -68,7 +70,11 @@ export async function startInvestigation(incidentInput: string, opts: StartOptio
   const timeoutMs = opts.timeoutMs ?? INITIAL_BUDGET.timeoutMs;
   const effort = process.env.LLM_EFFORT as SessionConfig["effort"];
   const session = opts.session ?? newSession(opts.provider ?? resolveProvider(), { model: opts.model, effort });
-  session.addUserText(initialUserMessage(incidentInput, formatPreAnalysis(ctx.pa), { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }));
+  // Coverage first: does the data say anything about what was reported?
+  state.coverage = checkCoverage(incidentInput, ctx.store);
+  session.addUserText(
+    initialUserMessage(incidentInput, formatPreAnalysis(ctx.pa), { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }, formatCoverage(state.coverage)),
+  );
 
   const persist = () =>
     saveInvestigation({ state, provider: session.provider, model: session.model, history: session.history, userEvidence: [] });
@@ -114,6 +120,10 @@ export async function followUpInvestigation(id: string, rawMessage: string, opts
   for (const e of stored.userEvidence) ctx.store.add(e);
   const evidence = ctx.store.addUserEvidence(message);
   const userEvidence = [...stored.userEvidence, evidence];
+  // Decide in code what this follow-up is before it can influence anything.
+  const cls = classifyFollowUp(message);
+  ctx.followUpKind = cls.kind;
+  ctx.baselineConfidence = new Map(state.hypotheses.map((h) => [h.id, { confidence: h.confidence, evidence: [...h.supporting, ...h.contradicting] }]));
 
   const maxSteps = opts.maxSteps ?? FOLLOWUP_BUDGET.maxSteps;
   const timeoutMs = opts.timeoutMs ?? FOLLOWUP_BUDGET.timeoutMs;
@@ -121,7 +131,7 @@ export async function followUpInvestigation(id: string, rawMessage: string, opts
   const session =
     opts.session ??
     newSession(stored.provider, { model: stored.model, history: stored.history, effort: process.env.LLM_EFFORT as SessionConfig["effort"] });
-  session.addUserText(followUpMessage(message, evidence.id, { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }));
+  session.addUserText(followUpMessage(message, evidence.id, { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }, cls));
 
   const before = snapshot(state);
   const persist = () => saveInvestigation({ state, provider: session.provider, model: session.model, history: session.history, userEvidence });

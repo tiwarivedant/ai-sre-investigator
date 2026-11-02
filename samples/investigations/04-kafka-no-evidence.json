@@ -1,0 +1,450 @@
+{
+  "state": {
+    "id": "sample-04-kafka-no-evidence",
+    "incidentInput": "Kafka consumers are lagging.",
+    "createdAt": "2026-11-02T20:12:54.041Z",
+    "updatedAt": "2026-11-02T20:13:05.867Z",
+    "status": "complete",
+    "summary": "No evidence exists for the reported symptom (Kafka consumer lag): \"kafka\", \"consumer\" and \"lag\" appear nowhere in the catalog, alerts, logs, metrics or changes. A separate incident, INC-2213, is active: orders-db connection exhaustion after inventory-service DB_POOL_MAX was raised from 20 to 80 (CFG-502) at 13:52. That change coincides with the metric onset at 13:55 (MET-orders_db.active_connections, MET-inventory.db_pool_in_use). It causes checkout errors. It is not a Kafka issue, and I can't link it to the report.",
+    "impact": "Reported Kafka lag: no evidence of impact in this data. The separate INC-2213 started at 13:55 on the metrics. It shows checkout 5xx rising from 0.32% to a 7.9% peak (MET-checkout.error_rate_pct) and orders-db connections at 99% (MET-orders_db.active_connections). Support saw 87 tickets by 14:30 (CUST-001) and 14 reports of cards charged with no order confirmation (CUST-002).",
+    "timeline": [
+      {
+        "ts": "2026-10-28T13:40:00Z",
+        "evidenceId": "DEP-102",
+        "note": "Deploy payments-service v2.14.0: Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:52:00Z",
+        "evidenceId": "CFG-502",
+        "note": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-checkout.error_rate_pct",
+        "note": "Rose 0.32 -> 1.1 (peak 7.9)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-inventory.db_pool_in_use",
+        "note": "Rose 78 -> 290 (peak 323)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T13:55:00Z",
+        "evidenceId": "MET-orders_db.active_connections",
+        "note": "Rose 244.5 -> 331 (peak 397)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:00:00Z",
+        "evidenceId": "ALR-006",
+        "note": "[critical] orders-db active connections above 95% of max (393 / 400)",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:03:00Z",
+        "evidenceId": "CUST-001",
+        "note": "Spike in \"Something went wrong\" at Place Order. 87 tickets by 14:30 (normal: ~5/hour).",
+        "kind": "event",
+        "source": "code"
+      },
+      {
+        "ts": "2026-10-28T14:06:00Z",
+        "evidenceId": "ALR-012",
+        "note": "[critical] INC-2213 opened: Checkout errors and slowness reported by customers",
+        "kind": "event",
+        "source": "code"
+      }
+    ],
+    "keySignals": [
+      {
+        "evidenceId": "ALR-012",
+        "why": "[critical] INC-2213 opened: Checkout errors and slowness reported by customers",
+        "source": "code"
+      }
+    ],
+    "noise": [
+      {
+        "evidenceId": "ALR-001",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "outside blast radius",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-002",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "not in catalog",
+          "preceded onset"
+        ]
+      },
+      {
+        "evidenceId": "ALR-003",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      },
+      {
+        "evidenceId": "ALR-011",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "info severity"
+        ]
+      },
+      {
+        "evidenceId": "ALR-013",
+        "why": "",
+        "source": "code",
+        "flags": [
+          "resolved quickly",
+          "repeated flap",
+          "outside blast radius"
+        ]
+      }
+    ],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "Kafka consumer lag is a separate problem not visible in this data; no Kafka telemetry exists to evaluate.",
+        "confidence": 0.3,
+        "status": "active",
+        "supporting": [
+          "ALR-012"
+        ],
+        "contradicting": [],
+        "reasoning": "Coverage check found zero evidence for kafka, consumer or lag. Cannot be confirmed or refuted here."
+      },
+      {
+        "id": "H2",
+        "statement": "Kafka lag is related to the active checkout/orders-db incident (e.g. consumers blocked on DB connections).",
+        "confidence": 0.05,
+        "status": "active",
+        "supporting": [
+          "ALR-006"
+        ],
+        "contradicting": [
+          "CUST-004"
+        ],
+        "reasoning": "Speculative; no Kafka component appears in the dependencies or logs. orders-service sees 'too many clients' errors, which could indirectly slow any DB-bound consumer, but there is no evidence."
+      }
+    ],
+    "openQuestions": [
+      "Which Kafka cluster, consumer group and service is lagging? Reporter to say.",
+      "Is Kafka telemetry (lag metrics, broker logs) available in another system? Platform/streaming team to say.",
+      "Does the lagging consumer write to orders-db? If so it may be affected by connection exhaustion. Its owner to say."
+    ],
+    "nextActions": [
+      {
+        "action": "Collect consumer lag metrics per consumer group, consumer group names, broker logs, and which services produce to or consume the affected topics, from the owners of kafka/consumer, and add it as a follow-up",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [],
+        "source": "code"
+      },
+      {
+        "action": "Ask the reporter for the consumer group, topic and service, and the lag graphs",
+        "owner": "incident responder",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "ALR-012"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Route the report to the Kafka/streaming platform owners",
+        "owner": "streaming platform on-call",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "ALR-012"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Check their lag dashboards, which are outside this dataset",
+        "owner": "streaming platform on-call",
+        "type": "investigate",
+        "risk": "low",
+        "riskReason": "rubric: investigate = low",
+        "phase": "now",
+        "evidence": [
+          "ALR-012"
+        ],
+        "source": "agent"
+      },
+      {
+        "action": "Close INC-2041's open action item: Add PgBouncer in front of orders-db",
+        "type": "prevention",
+        "phase": "prevention",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "priority": "P1"
+      },
+      {
+        "action": "Close INC-2041's open action item: Config-service guardrail on pool sizes",
+        "type": "prevention",
+        "phase": "prevention",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code",
+        "risk": "low",
+        "riskReason": "not risk-rated: planned post-incident work",
+        "priority": "P1"
+      }
+    ],
+    "stakeholderUpdate": "We found no data about Kafka consumer lag in our monitoring, so we can't confirm that report. Separately, an active incident is causing checkout errors and slowness, and its likely cause is a database connection limit being hit after a recent settings change. We are asking the reporter for details and routing the lag report to the streaming team. Next update in 30 minutes.",
+    "overallConfidence": 0.3,
+    "trace": [
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "summary": "No evidence exists for the reported symptom (Kafka consumer lag): \"kafka\", \"consumer\" and \"lag\" appear nowhere in the catalog, alerts, logs, metrics or changes. A separate incident, INC-2213, is active: orders-db connection exhaustion after inventory-service DB_POOL_MAX was raised from 20 to 80 (CFG-502) at 13:52. That change coincides with the metric onset at 13:55 (MET-orders_db.active_connections, MET-inventory.db_pool_in_use). It causes checkout errors. It is not a Kafka issue, and I can't link it to the report.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "statement": "Kafka consumer lag is a separate problem not visible in this data; no Kafka telemetry exists to evaluate.",
+              "confidence": 0.5,
+              "status": "active",
+              "supporting": [
+                "ALR-012"
+              ],
+              "contradicting": [],
+              "reasoning": "Coverage check found zero evidence for kafka, consumer or lag. Cannot be confirmed or refuted here."
+            },
+            {
+              "id": "H2",
+              "statement": "Kafka lag is related to the active checkout/orders-db incident (e.g. consumers blocked on DB connections).",
+              "confidence": 0.05,
+              "status": "active",
+              "supporting": [
+                "ALR-006"
+              ],
+              "contradicting": [
+                "CUST-004"
+              ],
+              "reasoning": "Speculative; no Kafka component appears in the dependencies or logs. orders-service sees 'too many clients' errors, which could indirectly slow any DB-bound consumer, but there is no evidence."
+            }
+          ],
+          "otherActiveIssues": [
+            {
+              "title": "INC-2213 checkout errors: orders-db connection exhaustion",
+              "evidence": [
+                "CFG-502",
+                "ALR-006",
+                "ALR-007",
+                "LOG-040",
+                "CUST-001"
+              ],
+              "relationship": "unknown; no Kafka link in the data. Likely cause: inventory-service DB_POOL_MAX 20->80 (CFG-502) exhausted orders-db max_connections (owner: inventory-service / orders-db teams)."
+            }
+          ],
+          "openQuestions": [
+            "Which Kafka cluster, consumer group and service is lagging? Reporter to say.",
+            "Is Kafka telemetry (lag metrics, broker logs) available in another system? Platform/streaming team to say.",
+            "Does the lagging consumer write to orders-db? If so it may be affected by connection exhaustion. Its owner to say."
+          ],
+          "nextActions": [
+            {
+              "action": "Ask the reporter for the consumer group, topic and service, and the lag graphs",
+              "type": "investigate",
+              "owner": "incident responder",
+              "evidence": [
+                "ALR-012"
+              ]
+            },
+            {
+              "action": "Route the report to the Kafka/streaming platform owners and check their lag dashboards, which are outside this dataset",
+              "type": "investigate",
+              "owner": "streaming platform on-call",
+              "evidence": [
+                "ALR-012"
+              ]
+            }
+          ],
+          "stakeholderUpdate": "We found no data about Kafka consumer lag in our monitoring, so we can't confirm that report. Separately, an active incident is causing checkout errors and slowness, and its likely cause is a database connection limit being hit after a recent settings change. We are asking the reporter for details and routing the lag report to the streaming team. Next update in 30 minutes."
+        },
+        "resultSummary": "updated summary, hypotheses, openQuestions, nextActions, otherActiveIssues, stakeholderUpdate · policy: nextActions[1]: split into 2 actions so each gets its own risk",
+        "ms": 9299
+      },
+      {
+        "step": 1,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "The reported symptom has no data in the available sources, so the brief states that and routes the report onward."
+        },
+        "resultSummary": "finalize rejected: missing impact",
+        "ms": 0
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "update_investigation",
+        "args": {
+          "impact": "Reported Kafka lag: no evidence of impact in this data. The separate INC-2213 started at 13:55 on the metrics. It shows checkout 5xx rising from 0.32% to a 7.9% peak (MET-checkout.error_rate_pct) and orders-db connections at 99% (MET-orders_db.active_connections). Support saw 87 tickets by 14:30 (CUST-001) and 14 reports of cards charged with no order confirmation (CUST-002)."
+        },
+        "resultSummary": "updated impact",
+        "ms": 2491
+      },
+      {
+        "step": 2,
+        "thought": "",
+        "tool": "finalize",
+        "args": {
+          "rationale": "The reported symptom has no data in the available sources, so the brief says so and routes the report to its owners."
+        },
+        "resultSummary": "finalized: The reported symptom has no data in the available sources, so the brief says so and routes the report to its owners.",
+        "ms": 3
+      }
+    ],
+    "revisions": [],
+    "groundingIssues": [],
+    "coverage": {
+      "verdict": "none",
+      "terms": [
+        {
+          "term": "kafka",
+          "kind": "component",
+          "hits": {},
+          "covered": false
+        },
+        {
+          "term": "consumer",
+          "kind": "component",
+          "hits": {},
+          "covered": false
+        },
+        {
+          "term": "lag",
+          "kind": "symptom",
+          "hits": {},
+          "covered": false
+        }
+      ],
+      "uncovered": [
+        "kafka",
+        "consumer"
+      ],
+      "searched": [
+        "catalog",
+        "alerts",
+        "logs",
+        "metrics",
+        "changes"
+      ]
+    },
+    "otherActiveIssues": [
+      {
+        "title": "INC-2213 checkout errors: orders-db connection exhaustion",
+        "evidence": [
+          "CFG-502",
+          "ALR-006",
+          "ALR-007",
+          "LOG-040",
+          "CUST-001"
+        ],
+        "relationship": "unknown; no Kafka link in the data. Likely cause: inventory-service DB_POOL_MAX 20->80 (CFG-502) exhausted orders-db max_connections (owner: inventory-service / orders-db teams).",
+        "source": "agent"
+      }
+    ],
+    "briefSource": "agent",
+    "similarIncidents": [
+      {
+        "incidentId": "INC-2041",
+        "hypothesisId": "H2",
+        "similarity": "Resembles H2 (active). Orders failing, orders-db connection exhaustion: reporting-service raised its DB pool from 15 to 100 to speed up a quarterly report.",
+        "lesson": "30 minutes lost investigating the most recent deploy rather than recent config changes.",
+        "source": "retrieval"
+      }
+    ],
+    "repeatIncident": {
+      "incidentId": "INC-2041",
+      "hypothesisId": "H2",
+      "openActionItems": [
+        "Add PgBouncer in front of orders-db",
+        "Config-service guardrail on pool sizes"
+      ]
+    },
+    "contributingFactors": [
+      {
+        "factor": "Safeguard still missing: \"Add PgBouncer in front of orders-db\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      },
+      {
+        "factor": "Safeguard still missing: \"Config-service guardrail on pool sizes\" was an action item from INC-2041 and is still open.",
+        "evidence": [
+          "INC-2041"
+        ],
+        "source": "code"
+      }
+    ],
+    "incidentStatus": "insufficient-evidence",
+    "doneActions": [],
+    "unexplained": [
+      {
+        "evidenceId": "MET-payments.p95_latency_ms",
+        "what": "payments.p95_latency_ms rose 416.25 -> 640 at 14:00, recovered 14:20",
+        "related": [
+          {
+            "evidenceId": "ALR-009",
+            "why": "alert note: Fires on inbound request latency, which includes time waiting on checkout's retried calls."
+          },
+          {
+            "evidenceId": "LOG-046",
+            "why": "log: inbound request queue depth 42 (client checkout-service retries)"
+          },
+          {
+            "evidenceId": "CFG-504",
+            "why": "series moved -35.1% in the 15 min after this change (confounded with DEP-103)"
+          },
+          {
+            "evidenceId": "DEP-103",
+            "why": "series moved -35.1% in the 15 min after this change (confounded with CFG-504)"
+          }
+        ]
+      }
+    ],
+    "consistencyIssues": []
+  },
+  "provider": "anthropic",
+  "model": "claude-sonnet-5-5",
+  "history": [],
+  "userEvidence": [],
+  "sample": true,
+  "recordedFrom": "anthropic/claude-sonnet-5-5"
+}

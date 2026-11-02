@@ -123,7 +123,8 @@ export function listInvestigations(limit = 50): { recent: InvestigationSummary[]
       .filter((x): x is StoredInvestigation => !!x)
       .map(summarize)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  return { recent: load(ids(DIR)).slice(0, limit), samples: load(ids(SAMPLES_DIR, SAMPLE_PREFIX)) };
+  // Samples are numbered (01-, 02-, ...): show them in that order, not by date.
+  return { recent: load(ids(DIR)).slice(0, limit), samples: load(ids(SAMPLES_DIR, SAMPLE_PREFIX)).sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
 /** Most recently updated saved investigation, for CLI convenience. */

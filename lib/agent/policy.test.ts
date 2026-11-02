@@ -150,3 +150,19 @@ describe("stakeholder wording", () => {
     expect(notHuman.update.hypotheses![0].confidence).toBe(0.95);
   });
 });
+
+describe("non-changing actions", () => {
+  it("are low risk even when they mention a rollback or restart", () => {
+    expect(assessRisk("investigate", "Ask Dana what evidence links v2.14.0 to the errors, given the rollback at 14:18 did not fix them")).toEqual({
+      risk: "low",
+      riskReason: 'rubric: "ask" changes nothing = low',
+    });
+    expect(assessRisk("communicate", "Notify the IC that restarting the pods is not needed").risk).toBe("low");
+    expect(assessRisk("investigate", "Confirm whether the rollback DEP-103 completed").risk).toBe("low");
+  });
+
+  it("still escalates actions that change things", () => {
+    expect(assessRisk("other", "Roll back payments-service to v2.13.4").risk).toBe("medium");
+    expect(assessRisk("config_revert", "Revert the pool and restart inventory pods").risk).toBe("medium");
+  });
+});

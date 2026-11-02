@@ -156,8 +156,15 @@ export interface InvestigationState {
   consistencyIssues?: string[];
   /** Actions a follow-up showed were already done, with the evidence that shows it. */
   doneActions?: { action: string; evidence: string[]; source: "agent" | "code" }[];
-  /** Incident lifecycle, derived from human evidence: cause confirmed, recovery reported, resolution reported. */
-  incidentStatus?: "investigating" | "identified" | "mitigated" | "resolved";
+  /** Incident lifecycle, derived from human evidence: cause confirmed, recovery reported, resolution reported.
+   * "insufficient-evidence": the available data says nothing about the reported symptom. */
+  incidentStatus?: "insufficient-evidence" | "investigating" | "identified" | "mitigated" | "resolved";
+  /** Does the data cover what was reported? Computed by code before the agent runs, refreshed with follow-ups. */
+  coverage?: import("@/lib/analysis/coverage").Coverage;
+  /** Follow-ups classified as instructions (e.g. prompt injection): ignored, never evidence. */
+  ignoredFollowUps?: { evidenceId: string; text: string; reason: string }[];
+  /** Other incidents active in the data, shown separately from the answer (relationship to the report stated). */
+  otherActiveIssues?: { title: string; evidence: string[]; relationship: string; source: "agent" | "code" }[];
   /** Who wrote the brief: the agent, or code (deterministic pre-analysis) because the agent never did. */
   briefSource?: "agent" | "pre-analysis";
 }

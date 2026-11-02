@@ -45,7 +45,14 @@ const ESCALATIONS: { re: RegExp; risk: Risk; why: string }[] = [
 
 const RANK: Record<Risk, number> = { low: 0, medium: 1, high: 2 };
 
+// Asking, confirming and communicating change nothing, whatever they mention ("Ask Dana ... the rollback").
+const NON_CHANGING = /^\s*(ask|confirm|check|verify|validate|notify|tell|inform|communicate|page|post|update (the )?(ic|incident|stakeholders|status page|channel)|query|review|decide|monitor|watch|reconcile with|get|collect|find out|look up)\b/i;
+
 export function assessRisk(type: ActionType, text: string): { risk: Risk; riskReason: string } {
+  if (type !== "prevention" && NON_CHANGING.test(text)) {
+    const verb = text.trim().split(/\s+/)[0].toLowerCase();
+    return { risk: "low", riskReason: `rubric: "${verb}" changes nothing = low` };
+  }
   let risk = RISK_RUBRIC[type];
   let riskReason = `rubric: ${type.replace("_", " ")} = ${risk}`;
   for (const e of ESCALATIONS) {

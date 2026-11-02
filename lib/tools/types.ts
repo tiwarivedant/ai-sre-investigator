@@ -15,6 +15,10 @@ export interface ToolContext {
   mustRewrite?: Set<"summary" | "impact">;
   /** finalize rejects a contradictory brief once; after that the issues stay visible in the brief instead. */
   consistencyWarned?: boolean;
+  /** Class of the follow-up driving this run, if any. Claims and instructions may not move confidence. */
+  followUpKind?: import("@/lib/analysis/followups").FollowUpKind;
+  /** Hypothesis confidences before this follow-up, restored after a claim/instruction follow-up. */
+  baselineConfidence?: Map<string, { confidence: number; evidence: string[] }>;
   /** finalize rejects once when Impact ignores the customer notes that exist. */
   impactWarned?: boolean;
 }
