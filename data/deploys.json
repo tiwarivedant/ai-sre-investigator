@@ -1,0 +1,34 @@
+[
+  {
+    "id": "DEP-101",
+    "timestamp": "2026-10-28T09:12:00Z",
+    "service": "search-service",
+    "type": "code_deploy",
+    "version": "v3.8.1",
+    "author": "jkim",
+    "summary": "Fix typo in facet labels",
+    "status": "succeeded"
+  },
+  {
+    "id": "DEP-102",
+    "timestamp": "2026-10-28T13:40:00Z",
+    "service": "payments-service",
+    "type": "code_deploy",
+    "version": "v2.14.0",
+    "author": "dortiz",
+    "summary": "Add 3DS2 challenge flow for EU cards; bump HTTP client library to 5.2",
+    "status": "succeeded",
+    "rollout": "canary 10% at 13:40, 100% at 13:47",
+    "canary_result": "passed (error rate 0.21% vs baseline 0.19%)"
+  },
+  {
+    "id": "DEP-103",
+    "timestamp": "2026-10-28T14:18:00Z",
+    "service": "payments-service",
+    "type": "rollback",
+    "version": "v2.13.4",
+    "author": "dortiz",
+    "summary": "Rollback v2.14.0 during INC-2213 investigation",
+    "status": "succeeded"
+  }
+]

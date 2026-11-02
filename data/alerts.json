@@ -1,0 +1,141 @@
+[
+  {
+    "id": "ALR-001",
+    "timestamp": "2026-10-28T13:31:00Z",
+    "source": "datadog",
+    "service": "log-host-03",
+    "severity": "warning",
+    "title": "Disk usage above 85% on log-host-03",
+    "value": "86.2%",
+    "status": "open"
+  },
+  {
+    "id": "ALR-002",
+    "timestamp": "2026-10-28T13:35:00Z",
+    "source": "cert-monitor",
+    "service": "api-gateway",
+    "severity": "warning",
+    "title": "TLS certificate for api.internal.example expires in 21 days",
+    "status": "open"
+  },
+  {
+    "id": "ALR-003",
+    "timestamp": "2026-10-28T13:44:00Z",
+    "source": "datadog",
+    "service": "search-service",
+    "severity": "warning",
+    "title": "Health check flapping on search-service pod search-7f9c",
+    "status": "resolved",
+    "resolved_at": "2026-10-28T13:46:00Z"
+  },
+  {
+    "id": "ALR-004",
+    "timestamp": "2026-10-28T13:56:00Z",
+    "source": "datadog",
+    "service": "orders-db",
+    "severity": "warning",
+    "title": "orders-db active connections above 80% of max",
+    "value": "331 / 400",
+    "status": "open"
+  },
+  {
+    "id": "ALR-005",
+    "timestamp": "2026-10-28T13:58:00Z",
+    "source": "datadog",
+    "service": "inventory-service",
+    "severity": "warning",
+    "title": "inventory-service p99 latency above 800ms",
+    "value": "1340ms",
+    "status": "open"
+  },
+  {
+    "id": "ALR-006",
+    "timestamp": "2026-10-28T14:00:00Z",
+    "source": "datadog",
+    "service": "orders-db",
+    "severity": "critical",
+    "title": "orders-db active connections above 95% of max",
+    "value": "393 / 400",
+    "status": "open"
+  },
+  {
+    "id": "ALR-007",
+    "timestamp": "2026-10-28T14:01:00Z",
+    "source": "datadog",
+    "service": "checkout-service",
+    "severity": "critical",
+    "title": "checkout-service 5xx rate above 2%",
+    "value": "6.8%",
+    "status": "open"
+  },
+  {
+    "id": "ALR-008",
+    "timestamp": "2026-10-28T14:02:00Z",
+    "source": "datadog",
+    "service": "checkout-service",
+    "severity": "critical",
+    "title": "checkout-service p99 latency above 1500ms (SLO breach)",
+    "value": "4820ms",
+    "status": "open"
+  },
+  {
+    "id": "ALR-009",
+    "timestamp": "2026-10-28T14:03:00Z",
+    "source": "datadog",
+    "service": "payments-service",
+    "severity": "warning",
+    "title": "payments-service p95 latency above 600ms",
+    "value": "640ms",
+    "status": "open",
+    "note": "Fires on inbound request latency, which includes time waiting on checkout's retried calls."
+  },
+  {
+    "id": "ALR-010",
+    "timestamp": "2026-10-28T14:04:00Z",
+    "source": "datadog",
+    "service": "orders-service",
+    "severity": "critical",
+    "title": "orders-service error rate above 5%",
+    "value": "9.1%",
+    "status": "open"
+  },
+  {
+    "id": "ALR-011",
+    "timestamp": "2026-10-28T14:05:00Z",
+    "source": "datadog",
+    "service": "reporting-service",
+    "severity": "info",
+    "title": "reporting-service CPU above 85% (hourly_sales_rollup)",
+    "value": "91%",
+    "status": "open"
+  },
+  {
+    "id": "ALR-012",
+    "timestamp": "2026-10-28T14:06:00Z",
+    "source": "pagerduty",
+    "service": "checkout-service",
+    "severity": "critical",
+    "title": "INC-2213 opened: Checkout errors and slowness reported by customers",
+    "status": "open"
+  },
+  {
+    "id": "ALR-013",
+    "timestamp": "2026-10-28T14:09:00Z",
+    "source": "datadog",
+    "service": "search-service",
+    "severity": "warning",
+    "title": "Health check flapping on search-service pod search-7f9c",
+    "status": "resolved",
+    "resolved_at": "2026-10-28T14:10:00Z"
+  },
+  {
+    "id": "ALR-014",
+    "timestamp": "2026-10-28T14:22:00Z",
+    "source": "datadog",
+    "service": "checkout-service",
+    "severity": "critical",
+    "title": "checkout-service 5xx rate above 2% (still firing after payments rollback)",
+    "value": "7.4%",
+    "status": "open"
+  }
+]

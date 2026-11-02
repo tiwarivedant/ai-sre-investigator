@@ -1,0 +1,41 @@
+[
+  {
+    "id": "CFG-501",
+    "timestamp": "2026-10-28T11:05:00Z",
+    "service": "web-frontend",
+    "source": "feature-flag-service",
+    "author": "storefront-bot",
+    "change": "flag holiday_banner: false -> true",
+    "ticket": null
+  },
+  {
+    "id": "CFG-502",
+    "timestamp": "2026-10-28T13:52:00Z",
+    "service": "inventory-service",
+    "source": "config-service",
+    "author": "mlee",
+    "change": "DB_POOL_MAX: 20 -> 80",
+    "comment": "stock checks slow during promo, more connections should help",
+    "applies_to": "all 6 replicas, hot-reloaded (no deploy)",
+    "ticket": null
+  },
+  {
+    "id": "CFG-503",
+    "timestamp": "2026-10-28T14:02:00Z",
+    "service": "reporting-service",
+    "source": "scheduler",
+    "author": "system",
+    "change": "hourly_sales_rollup job started",
+    "ticket": null
+  },
+  {
+    "id": "CFG-504",
+    "timestamp": "2026-10-28T14:16:00Z",
+    "service": "checkout-service",
+    "source": "feature-flag-service",
+    "author": "pshah",
+    "change": "flag payments_retry_on_timeout: true -> false",
+    "comment": "reduce retry amplification to payments during INC-2213",
+    "ticket": "INC-2213"
+  }
+]

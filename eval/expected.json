@@ -1,0 +1,35 @@
+{
+  "_warning": "ANSWER KEY. Used only by the eval script. Never load this into agent prompts, tools, or retrieval.",
+  "incident": "INC-2213",
+  "root_cause": {
+    "summary": "inventory-service DB_POOL_MAX raised from 20 to 80 via config-service at 13:52 (CFG-502). 6 replicas x 80 = 480 potential connections against orders-db max_connections=400, exhausting the shared pool. orders-service and inventory-service could not get connections, causing checkout 500s and latency.",
+    "must_mention_any": ["CFG-502", "DB_POOL_MAX", "pool"],
+    "service": "inventory-service",
+    "key_evidence": ["CFG-502", "LOG-024", "LOG-033", "LOG-076", "ALR-006"]
+  },
+  "red_herring": {
+    "id": "DEP-102",
+    "why_rejected": [
+      "payments error rate flat at ~0.2% throughout (metrics)",
+      "canary passed",
+      "symptoms started ~13:55, 8 minutes after 100% rollout, aligned with CFG-502 instead",
+      "rollback DEP-103 at 14:18-14:20 did not reduce checkout errors (ALR-014)",
+      "payments latency increase explained by checkout retries (LOG with queue depth, CFG-504 dropped it)"
+    ]
+  },
+  "noise_alerts": ["ALR-001", "ALR-002", "ALR-003", "ALR-011", "ALR-013"],
+  "contributing_factors": [
+    "No PgBouncer in front of orders-db (open action item from INC-2041)",
+    "Config-service changes not shown on deploy dashboard",
+    "No guardrail on replicas x pool size",
+    "Promo traffic ~10% above normal"
+  ],
+  "recommended_actions": [
+    "Revert inventory-service DB_POOL_MAX to 20 in config-service",
+    "Verify orders-db connections drop below 300 and checkout errors recover",
+    "Re-enable payments_retry_on_timeout after recovery",
+    "Follow up on 'charged but no order' tickets",
+    "Prioritize PgBouncer and config guardrail action items"
+  ],
+  "similar_past_incident": "INC-2041"
+}

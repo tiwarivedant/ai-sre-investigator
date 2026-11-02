@@ -1,0 +1,25 @@
+{
+  "description": "5-minute buckets, 2026-10-28 UTC. Values are averages over the bucket unless noted.",
+  "timestamps": ["13:30", "13:35", "13:40", "13:45", "13:50", "13:55", "14:00", "14:05", "14:10", "14:15", "14:20", "14:25", "14:30"],
+  "series": {
+    "checkout.error_rate_pct":        [0.3, 0.3, 0.3, 0.4, 0.3, 1.1, 6.8, 7.9, 7.2, 7.6, 7.4, 7.8, 7.5],
+    "checkout.p99_latency_ms":        [610, 590, 620, 640, 600, 1480, 4820, 5100, 4900, 5050, 4970, 5120, 5010],
+    "checkout.requests_per_min":      [2400, 2450, 2500, 2520, 2600, 2650, 2700, 2680, 2700, 2720, 2690, 2710, 2700],
+    "payments.error_rate_pct":        [0.19, 0.2, 0.21, 0.2, 0.22, 0.21, 0.23, 0.22, 0.21, 0.22, 0.2, 0.21, 0.2],
+    "payments.p95_latency_ms":        [410, 405, 420, 430, 415, 440, 640, 650, 630, 620, 410, 405, 400],
+    "payments.processor_latency_ms":  [180, 175, 185, 182, 178, 181, 179, 183, 180, 178, 181, 179, 182],
+    "inventory.p99_latency_ms":       [210, 220, 215, 230, 225, 980, 1340, 1420, 1380, 1400, 1390, 1410, 1395],
+    "inventory.db_pool_in_use":       [74, 76, 80, 82, 85, 290, 312, 318, 320, 322, 321, 323, 320],
+    "orders.error_rate_pct":          [0.1, 0.1, 0.1, 0.1, 0.1, 2.4, 9.1, 10.2, 9.8, 10.1, 9.9, 10.3, 10.0],
+    "orders_db.active_connections":   [238, 241, 247, 252, 256, 331, 393, 397, 397, 397, 396, 397, 397],
+    "orders_db.max_connections":      [400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400, 400],
+    "orders_db.cpu_pct":              [38, 39, 41, 42, 40, 55, 63, 66, 64, 65, 64, 66, 65],
+    "orders_db.slow_queries_per_min": [2, 1, 3, 2, 2, 4, 5, 6, 5, 5, 6, 5, 6],
+    "reporting.cpu_pct":              [20, 22, 21, 20, 22, 21, 24, 91, 89, 88, 40, 22, 21],
+    "log_host_03.disk_pct":           [85.9, 86.2, 86.3, 86.5, 86.6, 86.8, 87.0, 87.1, 87.3, 87.4, 87.6, 87.7, 87.9]
+  },
+  "notes": [
+    "payments.p95_latency_ms measures inbound request latency; payments.processor_latency_ms is the external card processor call alone.",
+    "orders_db CPU and slow queries rise modestly; the database itself is not saturated on CPU, it is saturated on connections."
+  ]
+}

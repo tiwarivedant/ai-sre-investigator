@@ -1,0 +1,78 @@
+{
+  "summary": "Marcus confirmed he changed the inventory-service pool (USER-001, CFG-502: DB_POOL_MAX 20->80). That raised the orders-db connection budget to 610 against max 400. Inventory holds ~320 connections (LOG-076, LOG-121), starving orders-service and failing checkout. Cause is human-confirmed as the change; recovery after the revert is not yet verified.",
+  "impact": "Checkout errors from 14:03; 87 tickets by 14:30 against a normal ~5/hour (CUST-001). 14 customers report a card charge with no order confirmation (CUST-002). Search, browse and account pages are unaffected (CUST-004). Impact is in all regions (CUST-005).",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "inventory-service pool increase (CFG-502) exhausted orders-db connections, starving orders-service and failing checkout",
+      "confidence": 0.93,
+      "status": "confirmed",
+      "supporting": [
+        "USER-001",
+        "CFG-502",
+        "LOG-076",
+        "LOG-121",
+        "LOG-040",
+        "ALR-006"
+      ],
+      "contradicting": [],
+      "reasoning": "The change owner confirmed the change. Telemetry timing and the connection split match. Payments latency was a retry-driven symptom (LOG-046). Recovery after the fix is not yet reported, so confidence stays below 0.95."
+    },
+    {
+      "id": "H2",
+      "statement": "payments v2.14.0 caused the errors",
+      "confidence": 0.03,
+      "status": "rejected",
+      "supporting": [
+        "DEP-102"
+      ],
+      "contradicting": [
+        "ALR-014",
+        "DEP-103"
+      ],
+      "reasoning": "The rollback did not fix the 5xx errors."
+    }
+  ],
+  "keySignals": [
+    {
+      "evidenceId": "LOG-076",
+      "why": "inventory holds 318 of 397 connections"
+    },
+    {
+      "evidenceId": "CFG-502",
+      "why": "pool override causing over-commit"
+    },
+    {
+      "evidenceId": "LOG-046",
+      "why": "payments latency is retry-induced symptom"
+    }
+  ],
+  "noise": [
+    {
+      "evidenceId": "ALR-001",
+      "why": "flagged by heuristics: outside blast radius, preceded onset",
+      "source": "code"
+    },
+    {
+      "evidenceId": "ALR-002",
+      "why": "flagged by heuristics: not in catalog, preceded onset",
+      "source": "code"
+    },
+    {
+      "evidenceId": "ALR-003",
+      "why": "flagged by heuristics: resolved quickly, repeated flap, outside blast radius",
+      "source": "code"
+    },
+    {
+      "evidenceId": "ALR-011",
+      "why": "flagged by heuristics: info severity",
+      "source": "code"
+    },
+    {
+      "evidenceId": "ALR-013",
+      "why": "flagged by heuristics: resolved quickly, repeated flap, outside blast radius",
+      "source": "code"
+    }
+  ],
+  "_note": "Brief fields from live run inv-20261102192159-42d7f0 (anthropic/claude-sonnet-5-5, after fixes). Used by derived.test.ts; the run itself is not kept."
+}

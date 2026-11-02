@@ -1,0 +1,81 @@
+# Service catalog: dependencies, owners, and on-call.
+# "depends_on" means this service calls the listed service/resource synchronously
+# unless marked async.
+
+services:
+  web-frontend:
+    tier: 1
+    owner_team: storefront
+    oncall: "@storefront-oncall"
+    depends_on: [checkout-service, search-service]
+
+  checkout-service:
+    tier: 1
+    owner_team: checkout
+    oncall: "@checkout-oncall (primary: Priya Shah)"
+    description: Orchestrates place-order. Calls inventory to reserve stock, payments to authorize, orders to persist.
+    depends_on: [inventory-service, payments-service, orders-service]
+    slo: "99.5% of place-order requests succeed; p99 < 1500ms"
+
+  inventory-service:
+    tier: 1
+    owner_team: inventory
+    oncall: "@inventory-oncall (primary: Marcus Lee)"
+    description: Stock levels and reservations.
+    depends_on: [orders-db]
+    replicas: 6
+    db_pool_default: 20
+
+  payments-service:
+    tier: 1
+    owner_team: payments
+    oncall: "@payments-oncall (primary: Dana Ortiz)"
+    description: Card authorization via external processor (Stripe-like). Own database.
+    depends_on: [payments-db, external-processor]
+
+  orders-service:
+    tier: 1
+    owner_team: checkout
+    oncall: "@checkout-oncall"
+    description: Persists orders.
+    depends_on: [orders-db]
+    replicas: 4
+    db_pool_default: 25
+
+  reporting-service:
+    tier: 3
+    owner_team: data-eng
+    oncall: "@data-eng-oncall"
+    description: Nightly and hourly analytics batch jobs. Reads from orders-db read path.
+    depends_on: [orders-db]
+    replicas: 2
+    db_pool_default: 15
+
+  search-service:
+    tier: 2
+    owner_team: storefront
+    oncall: "@storefront-oncall"
+    depends_on: [search-cluster]
+
+resources:
+  orders-db:
+    type: postgres
+    version: "15"
+    max_connections: 400
+    reserved_superuser_connections: 3
+    shared_by: [inventory-service, orders-service, reporting-service]
+    notes: "No connection pooler (PgBouncer) in front. Action item from INC-2041 still open."
+
+  payments-db:
+    type: postgres
+    max_connections: 300
+    shared_by: [payments-service]
+
+  external-processor:
+    type: third-party
+    status_page: "https://status.processor.example"
+
+  log-host-03:
+    type: vm
+    owner_team: platform
+    notes: "Central log shipper. Disk alerts at 85% are common and auto-rotated nightly."
