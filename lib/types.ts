@@ -36,13 +36,19 @@ export interface TimelineEntry {
   ts: string;
   evidenceId: string;
   note: string;
+  /** "ruled-out": evidence only a rejected hypothesis relies on (e.g. a red-herring deploy). */
+  kind?: "event" | "follow-up" | "ruled-out";
+  /** Who wrote the note: the agent, or code (from the evidence). Only agent notes carry over between refreshes. */
+  source?: "agent" | "code";
 }
 
 export interface CitedNote {
   evidenceId: string;
   why: string;
-  /** For noise: "code" = flagged by the deterministic heuristics. */
+  /** "code" = written by code (heuristic noise, derived key signals), not the agent. */
   source?: "agent" | "code";
+  /** For noise: the heuristic flags that also mark it, alongside any agent reason. */
+  flags?: string[];
 }
 
 export type Risk = "low" | "medium" | "high";
@@ -148,6 +154,10 @@ export interface InvestigationState {
   notNoise?: CitedNote[];
   /** Brief text that contradicts the hypotheses' status (checked by code). */
   consistencyIssues?: string[];
+  /** Actions a follow-up showed were already done, with the evidence that shows it. */
+  doneActions?: { action: string; evidence: string[]; source: "agent" | "code" }[];
+  /** Incident lifecycle, derived from human evidence: cause confirmed, recovery reported, resolution reported. */
+  incidentStatus?: "investigating" | "identified" | "mitigated" | "resolved";
   /** Who wrote the brief: the agent, or code (deterministic pre-analysis) because the agent never did. */
   briefSource?: "agent" | "pre-analysis";
 }

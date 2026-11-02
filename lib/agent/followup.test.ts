@@ -89,7 +89,7 @@ describe("followUpInvestigation", () => {
     // Human-confirmed: "confirmed" allowed, but capped at 0.95 until a human reports recovery after the fix.
     expect(out.hypotheses[0]).toMatchObject({ status: "confirmed", confidence: 0.95 });
     expect(out.trace.find((t) => t.tool === "update_investigation")?.step).toBe(5); // numbering continues
-    expect(out.revisions.at(-1)!.trigger).toMatch(/^follow-up USER-001/);
+    expect(out.revisions.at(-1)!.trigger).toBe("follow-up USER-001: Marcus confirms he changed the pool"); // no wrapping quotes
     expect(out.revisions.at(-1)!.changes).toContain("H1 status active -> confirmed");
     expect(out.revisions.at(-1)!.changes).toContain("H1 confidence 85% -> 95%");
 
@@ -131,5 +131,24 @@ describe("follow-up rewrite gate", () => {
     expect(finals[1]).toMatch(/^finalized/);
     expect(out.status).toBe("complete");
     expect(out.consistencyIssues).toEqual([]);
+  });
+});
+
+describe("key signals", () => {
+  it("are not wiped by an update that sends an empty list", async () => {
+    const { applyUpdate } = await import("@/lib/tools/stateTools");
+    const state = { ...newInvestigationState("x"), keySignals: [{ evidenceId: "CFG-502", why: "pool raised", source: "agent" as const }] };
+    applyUpdate(state, { keySignals: [] });
+    expect(state.keySignals.map((k) => k.evidenceId)).toEqual(["CFG-502"]);
+    applyUpdate(state, { keySignals: [{ evidenceId: "LOG-076", why: "pg_stat_activity" }] });
+    expect(state.keySignals.map((k) => k.evidenceId)).toEqual(["LOG-076"]);
+  });
+});
+
+describe("revisions", () => {
+  it("record incident status changes", async () => {
+    const { diffBriefs } = await import("./revisions");
+    const base = { hypotheses: [], overallConfidence: 0.9, openQuestions: [], nextActions: [] };
+    expect(diffBriefs({ ...base, incidentStatus: "identified" }, { ...base, incidentStatus: "mitigated" })).toEqual(["incident identified -> mitigated"]);
   });
 });

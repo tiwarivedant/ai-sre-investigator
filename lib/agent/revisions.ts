@@ -1,6 +1,7 @@
 import type { Hypothesis, InvestigationState, Revision } from "@/lib/types";
 
-type Snapshot = Pick<InvestigationState, "hypotheses" | "overallConfidence" | "openQuestions" | "nextActions">;
+type Snapshot = Pick<InvestigationState, "hypotheses" | "overallConfidence" | "openQuestions" | "nextActions"> &
+  Partial<Pick<InvestigationState, "incidentStatus">>;
 
 export function snapshot(s: InvestigationState): Snapshot {
   return structuredClone({
@@ -8,6 +9,7 @@ export function snapshot(s: InvestigationState): Snapshot {
     overallConfidence: s.overallConfidence,
     openQuestions: s.openQuestions,
     nextActions: s.nextActions,
+    incidentStatus: s.incidentStatus,
   });
 }
 
@@ -16,6 +18,8 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 /** Deterministic diff of what a follow-up changed, for the "What changed" banner. */
 export function diffBriefs(before: Snapshot, after: Snapshot): string[] {
   const changes: string[] = [];
+  if (before.incidentStatus && after.incidentStatus && before.incidentStatus !== after.incidentStatus)
+    changes.push(`incident ${before.incidentStatus} -> ${after.incidentStatus}`);
   const prev = new Map<string, Hypothesis>(before.hypotheses.map((h) => [h.id, h]));
   const next = new Map<string, Hypothesis>(after.hypotheses.map((h) => [h.id, h]));
 

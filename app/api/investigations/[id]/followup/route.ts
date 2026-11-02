@@ -3,6 +3,7 @@ import { followUpInvestigation } from "@/lib/investigation";
 import { isReplay, missingCredential } from "@/lib/llm";
 import { loadInvestigation } from "@/lib/store";
 import { isRunning, markRunning, publish } from "@/lib/runs";
+import { cleanFollowUp } from "@/lib/text";
 import { loadFixture, recordedFollowUps } from "@/lib/llm/replay";
 import {
   expectedFollowUp,
@@ -22,7 +23,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { message?: string };
-  const message = body.message?.trim();
+  const message = body.message ? cleanFollowUp(body.message) : "";
   if (!message) return NextResponse.json({ error: "message is required" }, { status: 400 });
   if (message.length > 8000) return NextResponse.json({ error: "message is too long (max 8000 chars)" }, { status: 400 });
 

@@ -1,0 +1,141 @@
+{
+  "summary": "Marcus confirmed (USER-001) that he raised inventory-service DB_POOL_MAX from 20 to 80 at 13:52 (CFG-502). That over-committed orders-db (610 budget vs 400 max) and starved orders-service, which caused the checkout errors. After the revert to 20 at 14:35, orders-db connections returned to 250 and checkout errors fell to 0.3% (USER-002). That is the baseline, so recovery is verified. Cause confirmed.",
+  "impact": "Checkout failed from about 13:55 until the revert at 14:35. 87 tickets by 14:30 against a normal ~5/hour (CUST-001). 14 customers report being charged with no order confirmation (CUST-002), so payment and order integrity still needs reconciling. Search and browsing were unaffected (CUST-004). Impact was in all regions (CUST-005). Checkout errors are back to 0.3% (USER-002).",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "statement": "CFG-502 raised inventory pool to 80/replica, exhausting orders-db connections; orders-service and inventory reservations failed, causing checkout 5xx and latency",
+      "confidence": 0.97,
+      "status": "confirmed",
+      "supporting": [
+        "CFG-502",
+        "USER-001",
+        "USER-002",
+        "LOG-076",
+        "LOG-121",
+        "LOG-040"
+      ],
+      "contradicting": [],
+      "reasoning": "Owner confirmed the change (USER-001). Reverting it restored connections and error rate (USER-002). Payments rollback had not helped (ALR-014), and payments latency was a symptom of checkout retries.",
+      "recoveryEvidence": [
+        "USER-002"
+      ]
+    },
+    {
+      "id": "H2",
+      "statement": "payments v2.14.0 caused the slowness",
+      "confidence": 0.02,
+      "status": "rejected",
+      "supporting": [
+        "DEP-102"
+      ],
+      "contradicting": [
+        "ALR-014",
+        "USER-002"
+      ],
+      "reasoning": "Recovery came from the pool revert, not the payments rollback."
+    }
+  ],
+  "timeline": [
+    {
+      "evidenceId": "CFG-502",
+      "note": "13:52 inventory pool 20->80",
+      "ts": ""
+    },
+    {
+      "evidenceId": "LOG-033",
+      "note": "13:57 connection slots exhausted",
+      "ts": ""
+    },
+    {
+      "evidenceId": "LOG-076",
+      "note": "14:11 inventory holds 318/400 connections",
+      "ts": ""
+    },
+    {
+      "evidenceId": "DEP-103",
+      "note": "14:18 payments rollback; errors persist (ALR-014)",
+      "ts": ""
+    }
+  ],
+  "keySignals": [],
+  "noise": [],
+  "nextActions": [
+    {
+      "action": "Reconcile charged-without-order cases and release duplicate holds",
+      "owner": "payments/orders on-call",
+      "type": "investigate",
+      "risk": "low",
+      "riskReason": "rubric: investigate = low",
+      "phase": "now",
+      "evidence": [
+        "CUST-002"
+      ],
+      "source": "agent"
+    },
+    {
+      "action": "Re-enable checkout payments_retry_on_timeout now that recovery is verified, if still wanted",
+      "owner": "checkout on-call",
+      "type": "flag_change",
+      "risk": "low",
+      "riskReason": "rubric: flag change = low",
+      "phase": "after_recovery",
+      "evidence": [
+        "CFG-504",
+        "USER-002"
+      ],
+      "source": "agent"
+    },
+    {
+      "action": "Add PgBouncer in front of orders-db (open INC-2041 item)",
+      "owner": "DB platform",
+      "type": "prevention",
+      "risk": "low",
+      "riskReason": "not risk-rated: planned post-incident work",
+      "phase": "prevention",
+      "priority": "P1",
+      "evidence": [
+        "INC-2041"
+      ],
+      "source": "agent"
+    },
+    {
+      "action": "Add config guardrail validating pool sizes against max_connections",
+      "owner": "Platform",
+      "type": "prevention",
+      "risk": "low",
+      "riskReason": "not risk-rated: planned post-incident work",
+      "phase": "prevention",
+      "priority": "P1",
+      "evidence": [
+        "CFG-502"
+      ],
+      "source": "agent"
+    }
+  ],
+  "openQuestions": [
+    "How many customers were charged without an order, and have the holds been released or refunded? (payments/orders on-call)",
+    "Why was the pool raised to 80 without a connection budget check? (Marcus / inventory team)"
+  ],
+  "userEvidence": [
+    {
+      "id": "USER-001",
+      "kind": "user",
+      "timestamp": "2026-11-02T19:28:48.031Z",
+      "title": "Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.",
+      "raw": {
+        "text": "Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52."
+      }
+    },
+    {
+      "id": "USER-002",
+      "kind": "user",
+      "timestamp": "2026-11-02T19:29:16.952Z",
+      "title": "Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%.",
+      "raw": {
+        "text": "Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%."
+      }
+    }
+  ],
+  "_note": "Agent-written brief fields from live run inv-20261102192821-502786 (anthropic/claude-sonnet-5-5, two follow-ups: owner confirmation, then recovery after revert). Used by derived.test.ts."
+}

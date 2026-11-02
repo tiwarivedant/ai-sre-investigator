@@ -2,7 +2,7 @@ import { z } from "zod";
 import { InvestigationUpdateSchema } from "@/lib/agent/schemas";
 import { checkGrounding, stripUnknown } from "@/lib/agent/grounding";
 import { applyPolicy, missingOpenQuestions } from "@/lib/agent/policy";
-import { refreshDerived } from "@/lib/agent/derived";
+import { attachRecovery, recoveryReports, refreshDerived } from "@/lib/agent/derived";
 import type { Hypothesis, InvestigationState, NextAction } from "@/lib/types";
 import { defineTool, type ToolContext } from "./types";
 
@@ -33,6 +33,7 @@ export const updateInvestigation = defineTool({
       ctx.state.groundingIssues.push(...report.locations.map((l) => `stripped unverified citation (${l})`));
     }
 
+    if (update.hypotheses) update = { ...update, hypotheses: attachRecovery(update.hypotheses, recoveryReports(ctx.store)) };
     const policy = applyPolicy(update, ctx.pa.changes, ctx.state.hypotheses);
     applyUpdate(ctx.state, policy.update, policy.nextActions);
     refreshDerived(ctx.state, ctx.pa, ctx.store);
@@ -76,13 +77,32 @@ export const updateInvestigation = defineTool({
 
 /** Merge a validated, policy-checked update. `nextActions` must be the policy-normalised list (with risk/phase). */
 export function applyUpdate(state: InvestigationState, update: z.infer<typeof InvestigationUpdateSchema>, nextActions?: NextAction[]) {
-  const { nextActions: _raw, similarIncidents: agentSimilar, contributingFactors: agentFactors, noise: agentNoise, ...rest } = update;
+  const {
+    nextActions: _raw,
+    similarIncidents: agentSimilar,
+    contributingFactors: agentFactors,
+    noise: agentNoise,
+    keySignals: _ks,
+    completedActions,
+    ...rest
+  } = update;
   Object.assign(state, rest);
   // Timeline entries arrive without times; refreshDerived fills them from the evidence.
-  if (update.timeline) state.timeline = update.timeline.map((t) => ({ ...t, ts: "" }));
-  if (agentNoise) state.noise = agentNoise.map((n) => ({ ...n, source: "agent" as const }));
+  if (update.timeline) state.timeline = update.timeline.map((t) => ({ ...t, ts: "", source: "agent" as const }));
+  if (agentNoise) {
+    // Keep earlier agent reasons for items this update leaves out (code re-adds flagged ones anyway).
+    const earlier = state.noise.filter((n) => n.source === "agent" && !agentNoise.some((a) => a.evidenceId === n.evidenceId));
+    state.noise = [...agentNoise.map((n) => ({ ...n, source: "agent" as const })), ...earlier];
+  }
+  // An empty key-signals list is "no change", not "clear them".
+  if (update.keySignals) state.keySignals = update.keySignals.length ? update.keySignals.map((k) => ({ ...k, source: "agent" as const })) : state.keySignals;
   if (agentSimilar) state.similarIncidents = agentSimilar.map((x) => ({ ...x, source: "agent" as const }));
   if (agentFactors) state.contributingFactors = agentFactors.map((f) => ({ ...f, source: "agent" as const }));
+  if (completedActions?.length) {
+    const done = state.doneActions ?? [];
+    for (const c of completedActions) if (!done.some((d) => d.action === c.action)) done.push({ ...c, source: "agent" });
+    state.doneActions = done;
+  }
   // Agent-sent actions replace the agent's previous ones; code-derived ones are re-added by refreshDerived.
   if (nextActions) state.nextActions = [...nextActions.map((a) => ({ ...a, source: "agent" as const })), ...state.nextActions.filter((a) => a.source === "code")];
   state.briefSource = "agent";

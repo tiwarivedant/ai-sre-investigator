@@ -10,6 +10,7 @@
  */
 import fs from "node:fs";
 import { followUpInvestigation, startInvestigation } from "@/lib/investigation";
+import { cleanFollowUp, revisionLabel } from "@/lib/text";
 import { latestInvestigationId, loadInvestigation } from "@/lib/store";
 import type { AgentEvent } from "@/lib/agent/loop";
 import { briefToMarkdown } from "@/lib/brief/markdown";
@@ -36,7 +37,7 @@ const option = (name: string) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const optionValues = new Set([option("--out"), option("--followup")]);
-const freeText = args.filter((a) => !a.startsWith("--") && !optionValues.has(a)).join(" ");
+const freeText = cleanFollowUp(args.filter((a) => !a.startsWith("--") && !optionValues.has(a)).join(" "));
 let incidentOverride: string | undefined;
 const incidentText = () => incidentOverride ?? (freeText || EXAMPLE);
 
@@ -117,7 +118,7 @@ async function main() {
   console.log(`\n${"─".repeat(72)}\n`);
   console.log(md);
   const rev = followupId ? state.revisions.at(-1) : undefined;
-  if (rev) console.log(bold(`What changed (${rev.trigger}):\n`) + rev.changes.map((c) => `  • ${c}`).join("\n") + "\n");
+  if (rev) console.log(bold(`What changed (${revisionLabel(rev.trigger)}):\n`) + rev.changes.map((c) => `  • ${c}`).join("\n") + "\n");
   console.log(dim(`${state.status} in ${((Date.now() - started) / 1000).toFixed(1)}s · ${state.trace.length} trace steps · saved .investigations/${state.id}.json`));
   const out = option("--out");
   if (out) {

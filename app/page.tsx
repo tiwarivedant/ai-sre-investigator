@@ -5,7 +5,8 @@ import { useInvestigation } from "@/lib/client/useInvestigation";
 import { Brief } from "./components/Brief";
 import { Trace } from "./components/Trace";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
-import { HistoryMenu, SampleList } from "./components/History";
+import { HistoryMenu } from "./components/History";
+import { EmptyState } from "./components/EmptyState";
 import { EvidenceContext } from "./components/ui";
 import {
   expectedFollowUp,
@@ -26,7 +27,6 @@ interface Config {
   error?: string;
 }
 
-const EXAMPLE = "Customers are seeing errors at checkout and the site feels slow. Started maybe 15–20 min ago.";
 
 export default function Home() {
   const { state, info, running, progress, reset, load, error, errorCode, clearError, start, followUp, latestRevision, dismissRevision } = useInvestigation();
@@ -75,6 +75,14 @@ export default function Home() {
       el.setSelectionRange(el.value.length, el.value.length);
     });
   }, []);
+  const runIncident = () => {
+    if (!incident.trim() || running) return;
+    // Replay can only reproduce the recorded incident; don't pretend to investigate anything else.
+    if (sample && !matchesRecordedIncident(incident, sample.incidentInput)) return setReplayBlocked(true);
+    setReplayBlocked(false);
+    start(incident.trim());
+  };
+
   const suggestions = state?.status !== "running" ? (state?.openQuestions ?? []).slice(0, 3) : [];
 
   const openInvestigation = useCallback(
@@ -152,55 +160,7 @@ export default function Home() {
                 New investigation
               </button>
             </div>
-          ) : (
-          <form
-            className="mb-4 flex flex-col gap-2 sm:flex-row"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!incident.trim() || running) return;
-              // Replay can only reproduce the recorded incident; don't pretend to investigate anything else.
-              if (sample && !matchesRecordedIncident(incident, sample.incidentInput)) return setReplayBlocked(true);
-              setReplayBlocked(false);
-              start(incident.trim());
-            }}
-          >
-            <label htmlFor="incident" className="sr-only">
-              Describe the incident
-            </label>
-            <div className="relative flex-1">
-              <textarea
-                id="incident"
-                rows={2}
-                value={incident}
-                onChange={(e) => {
-                  setIncident(e.target.value);
-                  if (replayBlocked && sample && matchesRecordedIncident(e.target.value, sample.incidentInput)) setReplayBlocked(false);
-                }}
-                placeholder="What are responders seeing, and since when? (symptoms, affected users, rough start time)"
-                className="block min-h-[2.75rem] w-full resize-y rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 pr-28 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
-              />
-              {!incident.trim() && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIncident(sample ? sample.incidentInput : EXAMPLE);
-                    setReplayBlocked(false);
-                  }}
-                  className="absolute right-2 bottom-2 rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-zinc-300 hover:border-zinc-500 hover:text-zinc-100"
-                >
-                  Use example
-                </button>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={running || !incident.trim()}
-              className="rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 sm:self-stretch"
-            >
-              {running ? "Investigating…" : "Run investigation"}
-            </button>
-          </form>
-          )}
+          ) : null}
 
           {(replayBlocked || errorCode === REPLAY_MISMATCH) && (
             <div role="status" className="mb-4 flex flex-col gap-2 rounded-md border border-fuchsia-400/40 bg-fuchsia-500/5 px-3 py-2.5 sm:flex-row sm:items-center">
@@ -254,24 +214,32 @@ export default function Home() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
-            <div className="min-w-0">
-              {state ? (
-                <Brief state={state} changed={changed} onQuestion={askAbout} />
-              ) : (
-                <div className="rounded-lg border border-dashed border-zinc-800 px-6 py-16 text-center">
-                  <p className="text-sm text-zinc-300">Describe the incident and run an investigation.</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    The agent reads alerts, logs, deploys, config changes, metrics, runbooks and past incidents, and every claim it makes cites the evidence it rests on.
-                  </p>
-                  <SampleList onOpen={openInvestigation} />
-                </div>
-              )}
+          {!state && !running ? (
+            <EmptyState
+              incident={incident}
+              setIncident={(v) => {
+                setIncident(v);
+                if (replayBlocked && sample && matchesRecordedIncident(v, sample.incidentInput)) setReplayBlocked(false);
+              }}
+              onRun={runIncident}
+              running={running}
+              replaySample={sample?.incidentInput ?? null}
+              onOpen={openInvestigation}
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
+              <div className="min-w-0">
+                {state ? (
+                  <Brief state={state} changed={changed} onQuestion={askAbout} />
+                ) : (
+                  <div className="rounded-lg border border-dashed border-zinc-800 px-6 py-16 text-center text-sm text-zinc-400">Starting the investigation…</div>
+                )}
+              </div>
+              <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-5rem)]">
+                <Trace steps={state?.trace ?? []} running={running} progress={progress} />
+              </div>
             </div>
-            <div className="lg:sticky lg:top-16 lg:h-[calc(100vh-5rem)]">
-              <Trace steps={state?.trace ?? []} running={running} progress={progress} />
-            </div>
-          </div>
+          )}
         </main>
 
         {state && state.status !== "running" && followUpLocked && (

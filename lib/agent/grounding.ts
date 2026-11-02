@@ -50,6 +50,7 @@ export function checkGrounding(update: InvestigationUpdate, exists: (id: string)
   update.nextActions?.forEach((a, i) => a.evidence.forEach((id) => check(id, `nextActions[${i}]`)));
   update.similarIncidents?.forEach((x, i) => check(x.incidentId, `similarIncidents[${i}]`));
   update.contributingFactors?.forEach((f, i) => f.evidence.forEach((id) => check(id, `contributingFactors[${i}]`)));
+  update.completedActions?.forEach((a, i) => a.evidence.forEach((id) => check(id, `completedActions[${i}]`)));
   update.hypotheses?.forEach((h) => h.recoveryEvidence?.forEach((id) => check(id, `${h.id}.recoveryEvidence`)));
 
   return { unknownIds: [...unknown], locations };
@@ -68,6 +69,8 @@ export function stripUnknown(update: InvestigationUpdate, exists: (id: string) =
   if (out.notNoise) out.notNoise = out.notNoise.filter((s) => exists(s.evidenceId));
   if (out.nextActions) out.nextActions = out.nextActions.map((a) => ({ ...a, evidence: keep(a.evidence) }));
   if (out.similarIncidents) out.similarIncidents = out.similarIncidents.filter((x) => exists(x.incidentId));
+  if (out.completedActions)
+    out.completedActions = out.completedActions.map((a) => ({ ...a, evidence: keep(a.evidence) })).filter((a) => a.evidence.length > 0);
   if (out.contributingFactors)
     out.contributingFactors = out.contributingFactors.map((f) => ({ ...f, evidence: keep(f.evidence) })).filter((f) => f.evidence.length > 0);
   if (out.hypotheses) {

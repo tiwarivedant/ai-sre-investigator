@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { Hypothesis, InvestigationState, NextAction } from "@/lib/types";
 import { briefToMarkdown } from "@/lib/brief/markdown";
+import { revisionLabel } from "@/lib/text";
+import { IncidentChart, useChartData } from "./IncidentChart";
 import { Chips, confidenceWord, ConfidenceBar, EvidenceChip, HypothesisStatus, RichText, RiskBadge, RunStatus, Section } from "./ui";
 
 export function Brief({ state, changed, onQuestion }: { state: InvestigationState; changed: Set<string>; onQuestion: (q: string) => void }) {
@@ -11,9 +13,11 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
   const later = state.nextActions.filter((a) => a.phase === "after_recovery");
   const prevention = state.nextActions.filter((a) => a.phase === "prevention");
   const repeat = state.repeatIncident;
+  const chart = useChartData();
 
   return (
     <div className="space-y-3">
+      {state.briefSource !== "pre-analysis" && <StatusStepper state={state} />}
       <Verdict state={state} />
 
       {(state.consistencyIssues?.length ?? 0) > 0 && state.status !== "running" && (
@@ -146,7 +150,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
             </Section>
           )}
 
-          {(now.length > 0 || later.length > 0 || prevention.length > 0) && (
+          {(now.length > 0 || later.length > 0 || prevention.length > 0 || (state.doneActions?.length ?? 0) > 0) && (
             <Section title="Next actions">
               <ActionList actions={now} />
               {later.length > 0 && (
@@ -159,6 +163,23 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
                 <div className={now.length || later.length ? "mt-4 border-t border-zinc-800 pt-3" : ""}>
                   <h3 className="mb-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Prevent recurrence (post-incident)</h3>
                   <ActionList actions={prevention} muted />
+                </div>
+              )}
+              {(state.doneActions?.length ?? 0) > 0 && (
+                <div className="mt-4 border-t border-zinc-800 pt-3">
+                  <h3 className="mb-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Done</h3>
+                  <ul className="space-y-1.5">
+                    {state.doneActions!.map((d) => (
+                      <li key={d.action} className="flex flex-wrap items-baseline gap-2 text-sm text-zinc-500">
+                        <span className="text-emerald-400">✓</span>
+                        <span className="min-w-0 flex-1 line-through decoration-zinc-700">
+                          <RichText text={d.action} />
+                        </span>
+                        <span className="text-xs">per</span>
+                        <Chips ids={d.evidence} />
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </Section>
@@ -187,6 +208,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
 
           {state.timeline.length > 0 && (
             <Section title="Timeline (UTC)">
+              {chart && chart.series.length > 0 && <IncidentChart data={chart} />}
               <ol className="space-y-1">
                 {state.timeline.map((t, i) => (
                   <li key={`${t.evidenceId}-${i}`} className="grid grid-cols-[3.75rem_minmax(0,1fr)] items-baseline gap-2 text-sm">
@@ -197,8 +219,9 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
                     ) : (
                       <span className="font-mono text-xs text-zinc-500 tabular-nums">{t.ts.slice(11, 16)}</span>
                     )}
-                    <span className="text-zinc-300">
+                    <span className={t.kind === "ruled-out" ? "text-zinc-500" : "text-zinc-300"}>
                       <EvidenceChip id={t.evidenceId} /> <RichText text={t.note} />
+                      {t.kind === "ruled-out" && <span className="ml-1.5 text-[10px] tracking-wide text-zinc-500 uppercase">ruled out</span>}
                     </span>
                   </li>
                 ))}
@@ -208,6 +231,9 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
 
           <div className="grid gap-3 md:grid-cols-2">
             <Section title="Key signals">
+              {state.keySignals.length > 0 && state.keySignals.every((k) => k.source === "code") && (
+                <p className="mb-2 text-xs text-zinc-500">The agent listed none; showing the leading hypothesis&apos;s evidence.</p>
+              )}
               <SignalList items={state.keySignals} empty="None recorded." />
             </Section>
             <Section title="Noise (ruled out)">
@@ -243,7 +269,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
                 {state.revisions.map((r) => (
                   <li key={r.at}>
                     <div className="text-zinc-500">
-                      {new Date(r.at).toLocaleTimeString()} · <RichText text={r.trigger} />
+                      {new Date(r.at).toLocaleTimeString()} · <RichText text={revisionLabel(r.trigger)} />
                     </div>
                     <div className="mt-0.5 text-zinc-300">{r.changes.join(" · ")}</div>
                   </li>
@@ -318,6 +344,59 @@ function RejectedCard({ h, rank, highlight }: { h: Hypothesis; rank: number; hig
         </dl>
       </details>
     </article>
+  );
+}
+
+const STEPS: { key: NonNullable<InvestigationState["incidentStatus"]>; label: string; criterion: string }[] = [
+  { key: "investigating", label: "Investigating", criterion: "Gathering evidence; cause not yet confirmed by a human" },
+  { key: "identified", label: "Identified", criterion: "A human confirmed the cause" },
+  { key: "mitigated", label: "Mitigated", criterion: "A human reported recovery after the fix" },
+  { key: "resolved", label: "Resolved", criterion: "A later report says the recovery held" },
+];
+
+/** Incident lifecycle, derived only from human evidence; reached steps show what got them there. */
+function StatusStepper({ state }: { state: InvestigationState }) {
+  const current = STEPS.findIndex((st) => st.key === (state.incidentStatus ?? "investigating"));
+  const lead = state.hypotheses.find((h) => h.status !== "rejected");
+  const proof: Record<string, string[]> = {
+    identified: (lead?.supporting ?? []).filter((id) => id.startsWith("USER-")).slice(0, 1),
+    mitigated: (lead?.recoveryEvidence ?? []).filter((id) => id.startsWith("USER-")).slice(0, 1),
+    resolved: state.incidentStatus === "resolved" ? state.timeline.filter((t) => t.kind === "follow-up").slice(-1).map((t) => t.evidenceId) : [],
+  };
+  return (
+    <ol aria-label="Incident status" className="flex items-start gap-1 overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2.5">
+      {STEPS.map((st, i) => {
+        // The last step, once reached, is complete rather than in progress.
+        const done = i < current || (i === current && i === STEPS.length - 1);
+        const active = i === current && !done;
+        return (
+          <li key={st.key} className="flex min-w-0 flex-1 items-start gap-1" aria-current={active ? "step" : undefined}>
+            <div className="flex min-w-0 flex-col" title={st.criterion}>
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold ${
+                    active
+                      ? "border-sky-300 bg-sky-400/20 text-sky-100"
+                      : done
+                        ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-200"
+                        : "border-zinc-700 text-zinc-600"
+                  }`}
+                >
+                  {done ? "✓" : i + 1}
+                </span>
+                <span className={`text-xs font-medium whitespace-nowrap ${active ? "text-zinc-50" : done ? "text-zinc-300" : "text-zinc-600"}`}>{st.label}</span>
+              </div>
+              {(done || active) && proof[st.key]?.length ? (
+                <span className="mt-0.5 ml-6 text-[10px] text-zinc-500">
+                  per <EvidenceChip id={proof[st.key][0]} variant="inline" />
+                </span>
+              ) : null}
+            </div>
+            {i < STEPS.length - 1 && <span className={`mx-1 mt-2.5 h-px min-w-3 flex-1 ${i < current ? "bg-emerald-500/40" : "bg-zinc-800"}`} />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -413,7 +492,7 @@ function PriorityBadge({ priority }: { priority: "P1" | "P2" }) {
   );
 }
 
-function SignalList({ items, empty, muted }: { items: { evidenceId: string; why: string; source?: "agent" | "code" }[]; empty: string; muted?: boolean }) {
+function SignalList({ items, empty, muted }: { items: { evidenceId: string; why: string; source?: "agent" | "code"; flags?: string[] }[]; empty: string; muted?: boolean }) {
   if (!items.length) return <p className="text-sm text-zinc-500">{empty}</p>;
   return (
     <ul className="space-y-1.5">
@@ -421,8 +500,13 @@ function SignalList({ items, empty, muted }: { items: { evidenceId: string; why:
         <li key={`${s.evidenceId}-${i}`} className={`flex min-w-0 items-baseline gap-2 text-sm ${muted ? "text-zinc-400" : "text-zinc-300"}`}>
           <EvidenceChip id={s.evidenceId} />
           <span className="min-w-0 flex-1">
-            <RichText text={s.why} />
-            {s.source === "code" && <span className="ml-1.5 text-[10px] tracking-wide text-zinc-600 uppercase">heuristic</span>}
+            {/* Agent reason when it gave one; the heuristic tag shows the flags that also mark it. */}
+            {s.why ? <RichText text={s.why} /> : <span className="text-zinc-500">{(s.flags ?? []).join(" · ")}</span>}
+            {s.flags && (
+              <span className="ml-1.5 cursor-help text-[10px] tracking-wide text-zinc-600 uppercase" title={`Heuristic flags: ${s.flags.join(", ")}`}>
+                heuristic
+              </span>
+            )}
           </span>
         </li>
       ))}

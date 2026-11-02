@@ -7,6 +7,7 @@ import { followUpMessage, initialUserMessage, SYSTEM_PROMPT } from "@/lib/agent/
 import { makeRevision, snapshot } from "@/lib/agent/revisions";
 import { createSession, resolveProvider, type ChatSession, type ProviderName, type SessionConfig } from "@/lib/llm";
 import { loadInvestigation, saveInvestigation } from "@/lib/store";
+import { cleanFollowUp } from "@/lib/text";
 import type { InvestigationState } from "@/lib/types";
 import { toolSpecs, type ToolContext } from "@/lib/tools";
 
@@ -99,7 +100,8 @@ export interface FollowUpOptions extends Partial<Pick<AgentRunOptions, "maxSteps
  * hypothesis), the agent continues its saved conversation on the same
  * provider, and a revision records what changed.
  */
-export async function followUpInvestigation(id: string, message: string, opts: FollowUpOptions = {}): Promise<InvestigationState> {
+export async function followUpInvestigation(id: string, rawMessage: string, opts: FollowUpOptions = {}): Promise<InvestigationState> {
+  const message = cleanFollowUp(rawMessage);
   const stored = loadInvestigation(id);
   if (!stored) throw new Error(`No investigation ${id}`);
   if (stored.state.status === "running") throw new Error(`Investigation ${id} is still running`);
@@ -133,9 +135,15 @@ export async function followUpInvestigation(id: string, message: string, opts: F
       if (e.type !== "done") opts.onEvent?.(e);
     },
   });
-  const short = message.length > 80 ? `${message.slice(0, 79)}…` : message;
-  state.revisions.push(makeRevision(`follow-up ${evidence.id}: "${short}"`, before, snapshot(state)));
+  state.revisions.push(makeRevision(`follow-up ${evidence.id}: ${shorten(message, 90)}`, before, snapshot(state)));
   persist();
   opts.onEvent?.({ type: "done", state });
   return state;
+}
+
+/** Cut at a word boundary, no wrapping quotes (the label is shown as-is in the UI). */
+function shorten(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf(" "), max * 0.6)).trimEnd()}…`;
 }

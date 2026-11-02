@@ -23,13 +23,13 @@ export const InvestigationUpdateSchema = z
     summary: z.string().describe("2-4 sentences: what is happening, the leading explanation, and how sure you are. Cite IDs inline."),
     impact: z
       .string()
-      .describe("Who/what is affected and how badly, with evidence IDs inline. Include the customer-facing impact from support notes (CUST-): ticket volume, what customers see, any payment/order integrity concerns."),
+      .describe("Who/what is affected and how badly, with evidence IDs inline. Give the onset as the metric onset from the pre-analysis (code checks it). Include the customer-facing impact from support notes (CUST-): ticket volume, what customers see, any payment/order integrity concerns."),
     timeline: z
       .array(z.object({ evidenceId: z.string(), note: z.string() }))
       .describe("Key events. Full list; replaces the previous timeline. Times come from the evidence itself, so give only the ID and a note."),
     keySignals: z
       .array(z.object({ evidenceId: z.string(), why: z.string() }))
-      .describe("Evidence that matters for cause or impact. Full list; replaces the previous one."),
+      .describe("Evidence that matters for cause or impact. Full list; replaces the previous one (an empty list leaves it unchanged). Citing an anomaly's ID here, or in a hypothesis, marks it explained."),
     noise: z
       .array(z.object({ evidenceId: z.string(), why: z.string() }))
       .describe("Evidence judged unrelated or misleading, and why. Code always adds the alerts its heuristics flag as noise; list them here only to give a better reason."),
@@ -57,6 +57,9 @@ export const InvestigationUpdateSchema = z
         }),
       )
       .describe("Concrete, ordered actions with owner (team/on-call from the service catalog), one operation per action. Risk is assigned by code from the type."),
+    completedActions: z
+      .array(z.object({ action: z.string(), evidence: evidenceIds.min(1) }))
+      .describe("Next actions that new evidence shows are already done (e.g. a follow-up reports the revert), each with the evidence. They move to a Done list; omit them from nextActions."),
     contributingFactors: z
       .array(z.object({ factor: z.string(), evidence: evidenceIds.min(1) }))
       .describe("Conditions that let the cause become an incident or made it worse or slower to resolve (missing safeguards, visibility gaps, load). Not the cause itself. Code adds factors it can derive."),
@@ -73,7 +76,7 @@ export const InvestigationUpdateSchema = z
     stakeholderUpdate: z
       .string()
       .describe('3-5 plain-language sentences for leadership/support. No jargon, no evidence IDs. Say "likely cause" unless a human has confirmed it.'),
-    overallConfidence: confidence.describe("0..1 confidence in the leading hypothesis being the root cause. Capped at 0.85 by code unless a human has confirmed it."),
+    overallConfidence: confidence.describe("Ignored: code sets overall confidence to the leading hypothesis's confidence. Set confidence on the hypotheses."),
   })
   .partial()
   .strict();

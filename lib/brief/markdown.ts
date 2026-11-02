@@ -1,3 +1,4 @@
+import { revisionLabel } from "@/lib/text";
 import type { InvestigationState } from "@/lib/types";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -7,7 +8,9 @@ const ids = (xs: string[]) => (xs.length ? xs.map((x) => `\`${x}\``).join(" ") :
 export function briefToMarkdown(s: InvestigationState): string {
   const out: string[] = [];
   out.push(`# Investigation brief`);
-  out.push(`_${s.id} · status: **${s.status}**${s.statusReason ? ` (${s.statusReason})` : ""} · updated ${s.updatedAt}_`);
+  out.push(
+    `_${s.id} · run: **${s.status}**${s.statusReason ? ` (${s.statusReason})` : ""}${s.incidentStatus ? ` · incident: **${s.incidentStatus}**` : ""} · updated ${s.updatedAt}_`,
+  );
   out.push(`\n> ${s.incidentInput.replace(/\n/g, "\n> ")}`);
 
   if (s.consistencyIssues?.length) out.push(`\n> **Check this brief:** ${s.consistencyIssues.join("; ")}.`);
@@ -50,7 +53,8 @@ export function briefToMarkdown(s: InvestigationState): string {
 
   if (s.timeline.length) {
     out.push(`\n## Timeline (UTC)`);
-    for (const t of s.timeline) out.push(`- **${t.evidenceId.startsWith("USER-") ? "follow-up" : t.ts.slice(11, 16)}** \`${t.evidenceId}\` ${t.note}`);
+    for (const t of s.timeline)
+      out.push(`- **${t.kind === "follow-up" || t.evidenceId.startsWith("USER-") ? "follow-up" : t.ts.slice(11, 16)}** \`${t.evidenceId}\` ${t.note}${t.kind === "ruled-out" ? " _(ruled out)_" : ""}`);
   }
 
   if (s.keySignals.length) {
@@ -59,7 +63,9 @@ export function briefToMarkdown(s: InvestigationState): string {
   }
   if (s.noise.length) {
     out.push(`\n## Noise (ruled out)`);
-    for (const k of s.noise) out.push(`- \`${k.evidenceId}\` ${k.why}${k.source === "code" ? " _(heuristic)_" : ""}`);
+    // Reason once: the agent's reason (tagged heuristic if code also flags it), or just the flags.
+    for (const k of s.noise)
+      out.push(`- \`${k.evidenceId}\` ${k.why ? `${k.why}${k.flags ? " _(heuristic)_" : ""}` : `_heuristic: ${(k.flags ?? []).join(", ")}_`}`);
     for (const k of s.notNoise ?? []) out.push(`- kept as signal: \`${k.evidenceId}\` ${k.why}`);
   }
 
@@ -77,6 +83,10 @@ export function briefToMarkdown(s: InvestigationState): string {
   renderActions("Next actions", s.nextActions.filter((a) => a.phase === "now"));
   renderActions("After recovery is verified", s.nextActions.filter((a) => a.phase === "after_recovery"));
   renderActions("Prevent recurrence (post-incident)", s.nextActions.filter((a) => a.phase === "prevention"));
+  if (s.doneActions?.length) {
+    out.push(`\n## Done`);
+    for (const d of s.doneActions) out.push(`- [x] ${d.action} · per ${ids(d.evidence)}`);
+  }
 
   if (s.openQuestions.length) {
     out.push(`\n## Open questions`);
@@ -87,7 +97,7 @@ export function briefToMarkdown(s: InvestigationState): string {
 
   if (s.revisions.length) {
     out.push(`\n## Revisions`);
-    for (const r of s.revisions) out.push(`- ${r.at} (${r.trigger}): ${r.changes.join("; ")}`);
+    for (const r of s.revisions) out.push(`- ${r.at} (${revisionLabel(r.trigger)}): ${r.changes.join("; ")}`);
   }
   if (s.groundingIssues.length) {
     out.push(`\n## Grounding guard`);

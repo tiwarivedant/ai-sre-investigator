@@ -1,7 +1,8 @@
 import type { EvidenceStore } from "@/lib/evidence/loader";
 import type { PreAnalysis } from "@/lib/analysis/preAnalysis";
 import { Bm25Index, tokenize } from "@/lib/retrieval/bm25";
-import type { ContributingFactor, InvestigationState, NextAction, RepeatIncident, SimilarIncident } from "@/lib/types";
+import { cleanFollowUp } from "@/lib/text";
+import type { ContributingFactor, InvestigationState, NextAction, RepeatIncident, SimilarIncident, TimelineEntry } from "@/lib/types";
 
 // Deterministic checks recomputed after every brief update. Code does the
 // retrieval and bookkeeping; the agent still owns the judgment.
@@ -88,14 +89,37 @@ export function unexplainedSignals(state: InvestigationState, pa: PreAnalysis, s
     .toLowerCase();
   const named = (service: string) => new RegExp(`\\b${service.replace(/-service$/, "").replace(/[-_]/g, "[-_ ]?")}\\b`).test(explanation);
 
+  // Citing an anomaly's ID, or the same-service alert/log that explains it, anywhere in a hypothesis
+  // (any status, including its reasoning) or a key signal marks it explained: the brief addressed it.
+  const citedAnywhere = new Set(
+    [
+      ...state.hypotheses.flatMap((h) => [...h.supporting, ...h.contradicting, ...citedIn(h.statement), ...citedIn(h.reasoning)]),
+      ...state.keySignals.flatMap((k) => [k.evidenceId, ...citedIn(k.why)]),
+    ],
+  );
+
   return pa.changePoints
     .filter((c) => c.sustained && !cited.has(c.seriesId) && !coveredServices.has(c.service) && !named(c.service))
     .map((c) => ({
       evidenceId: c.seriesId,
       what: `${c.series} rose ${c.baseline} -> ${c.value} at ${c.ts.slice(11, 16)}${c.recoveredAt ? `, recovered ${c.recoveredAt.slice(11, 16)}` : ""}`,
       related: relatedEvidence(c.seriesId, pa, store),
-    }));
+      service: c.service,
+    }))
+    .filter((u) => {
+      if (citedAnywhere.has(u.evidenceId)) return false;
+      // Only same-service alerts and logs count; a change that merely coincided does not explain the anomaly.
+      const ownEvidence = u.related.filter((r) => {
+        const e = store.get(r.evidenceId);
+        return e?.service === u.service && (e.kind === "alert" || e.kind === "log");
+      });
+      return !ownEvidence.some((r) => citedAnywhere.has(r.evidenceId));
+    })
+    .map(({ service: _s, ...rest }) => rest);
 }
+
+const CITATION = /\b(?:ALR|LOG|DEP|CFG|CHAT|CUST|USER)-\d+\b|\bINC-\d+\b|\bRB-[a-z0-9-]+\b|\bMET-[a-z0-9_]+\.[a-z0-9_]+\b/g;
+const citedIn = (text: string | undefined) => text?.match(CITATION) ?? [];
 
 // --- Repeat incidents, contributing factors, prevention ---------------------
 
@@ -206,9 +230,18 @@ export function eventTime(id: string, pa: PreAnalysis, store: EvidenceStore): st
   return store.get(id)?.timestamp;
 }
 
-/** Brief text that contradicts what the hypotheses say. */
-export function consistencyIssues(state: InvestigationState): string[] {
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/** Brief text that contradicts what the hypotheses (or the metrics) say. */
+export function consistencyIssues(state: InvestigationState, onset?: string): string[] {
   const issues: string[] = [];
+  // Impact's start time must match the metric onset (customer reports lag it).
+  const start = state.impact.match(/\b(?:from|since|starting|started|starts|began|begins|beginning|onset)\b[^.]{0,25}?\b(\d{1,2}:\d{2})\b/i)?.[1];
+  if (start && onset && Math.abs(minutesOf(start) - minutesOf(onset.slice(11, 16))) > 5)
+    issues.push(`impact gives the start as ${start}, but the metrics changed at ${onset.slice(11, 16)} UTC (use the metric onset)`);
   const lead = state.hypotheses.find((h) => h.status !== "rejected");
   const confirmed = state.hypotheses.some((h) => h.status === "confirmed");
   const texts: [string, string][] = [
@@ -233,49 +266,272 @@ export function consistencyIssues(state: InvestigationState): string[] {
   return issues;
 }
 
+/** One-line description of a piece of evidence; metrics describe their change, not the series. */
+export function describeEvidence(id: string, pa: PreAnalysis, store: EvidenceStore): string {
+  if (id.startsWith("MET-")) {
+    // The chip already names the series; the note says what it did ("Rose 78 -> 290 (peak 323)").
+    const t = pa.timeline.find((x) => x.evidenceId === id && x.kind === "changepoint")?.title;
+    if (!t) return store.get(id)?.title ?? id;
+    const rest = t.replace(`${id.slice(4)} `, "");
+    return rest[0].toUpperCase() + rest.slice(1);
+  }
+  return store.get(id)?.title ?? id;
+}
+
+/** "13:52 inventory pool 20->80" -> "inventory pool 20->80": the time column already shows it. */
+export const stripLeadingTime = (note: string) => {
+  const out = note.replace(/^\s*\(?\d{1,2}:\d{2}(:\d{2})?\s*(utc|z)?\)?\s*(onwards?\b)?\s*[-–—:,]?\s*/i, "");
+  if (out === note || !out) return note; // nothing stripped: leave identifiers like "payments.p95_latency_ms" alone
+  return out[0].toUpperCase() + out.slice(1);
+};
+
+/**
+ * The timeline is every event the brief relies on, not just the ones the model
+ * listed: agent entries (their notes kept), everything cited by hypotheses, key
+ * signals, summary and impact, every human follow-up, and the deploys/config
+ * changes in the window before onset (so a red-herring deploy is always shown).
+ * Evidence only a rejected hypothesis relies on is tagged "ruled-out".
+ */
+export function buildBriefTimeline(state: InvestigationState, pa: PreAnalysis, store: EvidenceStore): TimelineEntry[] {
+  const live = state.hypotheses.filter((h) => h.status !== "rejected");
+  const rejected = state.hypotheses.filter((h) => h.status === "rejected");
+  const liveCited = new Set([
+    ...live.flatMap((h) => [...h.supporting, ...h.contradicting, ...citedIn(h.statement), ...citedIn(h.reasoning)]),
+    ...state.keySignals.flatMap((k) => [k.evidenceId, ...citedIn(k.why)]),
+    ...citedIn(state.summary),
+    ...citedIn(state.impact),
+    ...state.timeline.map((t) => t.evidenceId),
+  ]);
+  const rejectedCited = new Set(rejected.flatMap((h) => [...h.supporting, ...h.contradicting]));
+  // "Ruled out" = a rejected hypothesis rested on it and no live one lists it as evidence
+  // (live reasoning often names the red herring only to dismiss it).
+  const liveEvidence = new Set([...live.flatMap((h) => [...h.supporting, ...h.contradicting]), ...state.keySignals.map((k) => k.evidenceId)]);
+  const rejectedSupport = new Set(rejected.flatMap((h) => h.supporting));
+  const inWindow = pa.changes.filter((c) => c.relation === "before_onset_in_window").map((c) => c.id);
+  const followUps = store.list().filter((e) => e.kind === "user").map((e) => e.id);
+
+  const notes = new Map<string, string>();
+  for (const t of state.timeline) if (t.source !== "code") notes.set(t.evidenceId, stripLeadingTime(t.note));
+  for (const k of state.keySignals) if (k.source !== "code" && !notes.has(k.evidenceId)) notes.set(k.evidenceId, k.why);
+
+  const ids = [...new Set([...liveCited, ...rejectedCited, ...inWindow, ...followUps])];
+  const entries: TimelineEntry[] = [];
+  for (const id of ids) {
+    const ts = eventTime(id, pa, store);
+    if (!ts) continue; // runbooks, write-ups: not events
+    const e = store.get(id);
+    const kind: TimelineEntry["kind"] = id.startsWith("USER-") ? "follow-up" : rejectedSupport.has(id) && !liveEvidence.has(id) ? "ruled-out" : "event";
+    let note = notes.get(id) ?? describeEvidence(id, pa, store);
+    const source = notes.has(id) && kind !== "follow-up" ? ("agent" as const) : ("code" as const);
+    note = kind === "follow-up" ? `Follow-up: ${cleanFollowUp(e?.title ?? note)}` : stripLeadingTime(note);
+    entries.push({ ts, evidenceId: id, note, kind, source });
+  }
+  return entries.sort((a, b) => a.ts.localeCompare(b.ts) || a.evidenceId.localeCompare(b.evidenceId));
+}
+
+// Human report that service recovered after a fix ("connections back to 250", "error rate down to 0.3%", "restored").
+const RECOVERY =
+  /\b(recovered|recovery (is |was )?(complete|confirmed|verified|seen)|restored|back to (normal|baseline|healthy|\d)|returned to (normal|baseline|\d)|healthy again|(errors?|error rate|latency|connections)[^.;]{0,40}\b(back|down) to\b|errors? (have |has )?(cleared|stopped|gone))/i;
+const NEGATED = /\b(not|no|never|hasn'?t|haven'?t|isn'?t|aren'?t|wasn'?t|didn'?t|still not|yet to|without)\b[^.;]{0,25}\b(recover|restor|back to|returned|healthy|clear|down to|stopped)/i;
+
+/** USER- follow-ups that report recovery, judged from the human's own words (not left to the agent to tag). */
+export function recoveryReports(store: EvidenceStore): string[] {
+  return store
+    .list()
+    .filter((e) => e.kind === "user")
+    .filter((e) => {
+      const text = String((e.raw as { text?: string })?.text ?? e.title);
+      return RECOVERY.test(text) && !NEGATED.test(text);
+    })
+    .map((e) => e.id);
+}
+
+/** Attach detected recovery reports to the confirmed leading hypothesis (alongside any the agent cited). */
+export function attachRecovery<T extends { status: string; recoveryEvidence?: string[] }>(hypotheses: T[], reports: string[]): T[] {
+  if (!reports.length) return hypotheses;
+  const leadIdx = hypotheses.findIndex((h) => h.status !== "rejected");
+  if (leadIdx < 0 || hypotheses[leadIdx].status !== "confirmed") return hypotheses;
+  return hypotheses.map((h, i) => (i === leadIdx ? { ...h, recoveryEvidence: [...new Set([...(h.recoveryEvidence ?? []), ...reports])] } : h));
+}
+
+const RESOLVED = /\bresolv(ed|e the incident)\b|\bstable for (\d+|thirty|an?)\s*(min|minutes|hours?)\b|\bclos(ed|ing) the incident\b/i;
+
+/**
+ * Lifecycle from human evidence only: identified (cause confirmed), mitigated
+ * (recovery after the fix reported), resolved (a later report says it held).
+ */
+export function incidentStatus(state: InvestigationState, store: EvidenceStore): NonNullable<InvestigationState["incidentStatus"]> {
+  const lead = state.hypotheses.find((h) => h.status !== "rejected");
+  if (!lead || lead.status !== "confirmed") return "investigating";
+  const recovery = (lead.recoveryEvidence ?? []).filter((id) => id.startsWith("USER-"));
+  if (!recovery.length) return "identified";
+  const recoveredAt = recovery.map((id) => store.get(id)?.timestamp ?? "").sort()[0];
+  const resolvedReport = store
+    .list()
+    .filter((e) => e.kind === "user" && (e.timestamp ?? "") >= recoveredAt)
+    .some((e) => RESOLVED.test(String((e.raw as { text?: string })?.text ?? e.title)));
+  return resolvedReport ? "resolved" : "mitigated";
+}
+
+/** Closing steps once recovery is verified: watch it hold, then resolve; and learn from it. */
+function closingActions(state: InvestigationState, status: InvestigationState["incidentStatus"], repeat?: RepeatIncident): NextAction[] {
+  if (status !== "mitigated" && status !== "resolved") return [];
+  const lead = state.hypotheses.find((h) => h.status !== "rejected")!;
+  const recovery = (lead.recoveryEvidence ?? []).filter((id) => id.startsWith("USER-"));
+  const out: NextAction[] = [];
+  if (status === "mitigated")
+    out.push({
+      action: "Monitor error rate, latency and the affected resource for 30 minutes; if stable, resolve the incident",
+      owner: "incident commander",
+      type: "investigate",
+      risk: "low",
+      riskReason: "rubric: investigate = low",
+      phase: "now",
+      evidence: recovery,
+      source: "code",
+    });
+  out.push({
+    action: "Schedule the postmortem and assign owners to its action items",
+    owner: "incident commander",
+    type: "prevention",
+    risk: "low",
+    riskReason: "not risk-rated: planned post-incident work",
+    phase: "prevention",
+    priority: "P1",
+    evidence: [...recovery, ...(repeat ? [repeat.incidentId] : [])],
+    source: "code",
+  });
+  return out;
+}
+
+const IRREGULAR_PAST: Record<string, string[]> = {
+  roll: ["rolled"],
+  rollback: ["rolled back", "rollbacked"],
+  set: ["set"],
+  run: ["ran"],
+  page: ["paged"],
+  file: ["filed"],
+  re: [],
+};
+
+/** Past-tense forms of an action's leading verb ("Revert ..." -> reverted). */
+function pastForms(action: string): string[] {
+  const m = action.trim().toLowerCase().match(/^(re-[a-z]+|[a-z]+)(\s+back)?\b/);
+  if (!m) return [];
+  const verb = m[1];
+  if (/^(monitor|watch|check|verify|confirm|ask|decide|investigate|review|query)$/.test(verb)) return []; // ongoing, not one-off
+  const regular = verb.endsWith("e") ? `${verb}d` : verb.endsWith("y") ? `${verb.slice(0, -1)}ied` : `${verb}ed`;
+  const forms = [regular, ...(IRREGULAR_PAST[verb] ?? [])];
+  return m[2] ? forms.map((f) => `${f} back`) : forms;
+}
+
+/** Specific things an action names (identifiers, versions, numbers, hyphenated service names). */
+function specificTokens(action: string): string[] {
+  return (action.match(/[A-Za-z0-9_.-]+/g) ?? []).filter(
+    (t) => !/^(CFG|DEP|LOG|ALR|CHAT|CUST|USER|INC)-\d+$/.test(t) && (/_/.test(t) || /[A-Z]{2,}/.test(t) || (t.includes("-") && t.length >= 6) || /^v?\d+(\.\d+)+$/.test(t)),
+  );
+}
+
+/**
+ * Human follow-ups that report an action as already done: the follow-up uses
+ * the action's verb in the past tense ("reverted") and names the same specific
+ * thing (e.g. DB_POOL_MAX). Returns the USER- evidence IDs that satisfy it.
+ */
+export function satisfiedBy(action: string, followUps: { id: string; text: string }[]): string[] {
+  const forms = pastForms(action);
+  const specifics = specificTokens(action).map((t) => t.toLowerCase());
+  if (!forms.length || !specifics.length) return [];
+  return followUps
+    .filter((f) => {
+      const t = f.text.toLowerCase();
+      return forms.some((p) => new RegExp(`\\b${p.replace(/ /g, "\\s+")}\\b`).test(t)) && specifics.some((x) => t.includes(x));
+    })
+    .map((f) => f.id);
+}
+
 const PHASE_ORDER = { now: 0, after_recovery: 1, prevention: 2 } as const;
 
 /** Recompute everything code derives from the brief. Called after every accepted update and at finalize. */
 export function refreshDerived(state: InvestigationState, pa: PreAnalysis, store: EvidenceStore) {
-  // Timeline: times come from the evidence, never the model. Entries with no event time (runbooks, write-ups) are dropped.
-  state.timeline = state.timeline
-    .map((t) => ({ ...t, ts: eventTime(t.evidenceId, pa, store) ?? "" }))
-    .filter((t) => t.ts)
-    .sort((a, b) => a.ts.localeCompare(b.ts) || a.evidenceId.localeCompare(b.evidenceId));
+  // Recovery is read from the human's report, not left to the agent to tag (it often cites it only as support).
+  state.hypotheses = attachRecovery(state.hypotheses, recoveryReports(store));
 
-  // Noise: the heuristics' flags are always included; the agent may add items, give a better reason,
-  // or keep a flagged alert as signal (notNoise, with a reason).
+  // Key signals never go empty: if the agent wrote none, use the leading hypothesis's own evidence.
+  const lead = state.hypotheses.find((h) => h.status !== "rejected");
+  const agentSignals = state.keySignals.filter((k) => k.source !== "code");
+  state.keySignals = agentSignals.length
+    ? agentSignals
+    : (lead?.supporting ?? []).slice(0, 6).map((id) => ({ evidenceId: id, why: describeEvidence(id, pa, store), source: "code" as const }));
+
+  // Timeline: every event the brief relies on, times from the evidence (never the model).
+  state.timeline = buildBriefTimeline(state, pa, store);
+
+  // Noise: the heuristics' flags are always included and shown; the agent may add items, give its own
+  // reason (kept alongside the flags), or keep a flagged alert as signal (notNoise, with a reason).
+  const flagsById = new Map(pa.alerts.filter((a) => a.likelyNoise).map((a) => [a.id, a.flags.map((f) => f.replace(/_/g, " "))]));
   const overridden = new Set((state.notNoise ?? []).map((n) => n.evidenceId));
   const agentNoise = state.noise.filter((n) => n.source !== "code" && !overridden.has(n.evidenceId));
-  const codeNoise = pa.alerts
-    .filter((a) => a.likelyNoise && !overridden.has(a.id) && !agentNoise.some((n) => n.evidenceId === a.id))
-    .map((a) => ({ evidenceId: a.id, why: `flagged by heuristics: ${a.flags.join(", ").replace(/_/g, " ")}`, source: "code" as const }));
-  state.noise = [...agentNoise.map((n) => ({ ...n, source: "agent" as const })), ...codeNoise];
+  const codeNoise = [...flagsById.keys()]
+    .filter((id) => !overridden.has(id) && !agentNoise.some((n) => n.evidenceId === id))
+    .map((id) => ({ evidenceId: id, why: "", source: "code" as const }));
+  // Reason shown once: the agent's reason if it gave one, otherwise just the heuristic flags.
+  state.noise = [...agentNoise.map((n) => ({ ...n, source: "agent" as const })), ...codeNoise].map((n) => ({
+    ...n,
+    flags: flagsById.get(n.evidenceId),
+    why: n.source === "agent" ? n.why : "",
+  }));
 
   state.similarIncidents = similarIncidents(state, store);
   const repeat = repeatIncident(state, store);
   state.repeatIncident = repeat;
 
   const agentFactors = (state.contributingFactors ?? []).filter((f) => f.source === "agent");
-  state.contributingFactors = [
-    ...agentFactors,
-    ...derivedFactors(state, pa, store, repeat).filter((f) => !agentFactors.some((a) => overlaps(a.factor, f.factor))),
-  ];
+  // Code-derived factors (with their INC-2041-style citations) are always shown; an agent factor saying the same is dropped.
+  const codeFactors = derivedFactors(state, pa, store, repeat);
+  state.contributingFactors = [...agentFactors.filter((a) => !codeFactors.some((f) => overlaps(a.factor, f.factor, 0.4))), ...codeFactors];
 
   // Prevention: closing a repeat incident's open action items stops this exact failure recurring, so P1.
   const agentActions = state.nextActions
     .filter((a) => a.source !== "code")
     .map((a) =>
-      a.phase === "prevention" && repeat?.openActionItems.some((item) => coversItem(a.action, item)) ? { ...a, priority: "P1" as const } : a,
+      a.phase === "prevention" && repeat?.openActionItems.some((item) => coversItem(a.action, item))
+        ? { ...a, priority: "P1" as const, evidence: a.evidence.includes(repeat.incidentId) ? a.evidence : [repeat.incidentId, ...a.evidence] }
+        : a,
     );
   const covered = (repeat?.openActionItems ?? []).filter((item) => agentActions.some((a) => a.phase === "prevention" && coversItem(a.action, item)));
-  const codeActions: NextAction[] = preventionActions(repeat)
-    .filter((c) => !covered.some((item) => c.action.endsWith(item)))
-    .map((c) => ({ ...c, risk: "low" as const, riskReason: "not risk-rated: planned post-incident work", priority: "P1" as const }));
-  state.nextActions = [...agentActions, ...codeActions].sort(
+  const status = incidentStatus(state, store);
+  state.incidentStatus = status;
+  const codeActions: NextAction[] = [
+    ...preventionActions(repeat)
+      .filter((c) => !covered.some((item) => c.action.endsWith(item)))
+      .map((c) => ({ ...c, risk: "low" as const, riskReason: "not risk-rated: planned post-incident work", priority: "P1" as const })),
+    // Unless the agent already has them.
+    ...closingActions(state, status, repeat).filter((c) =>
+      /postmortem/i.test(c.action)
+        ? !agentActions.some((a) => /post-?mortem|retro(spective)?|incident review/i.test(a.action))
+        : !agentActions.some((a) => /\b(monitor|watch)\b/i.test(a.action) && /\bresolv/i.test(a.action)),
+    ),
+  ];
+  // Actions a human follow-up reports as done move to Done, citing that follow-up.
+  const followUps = store
+    .list()
+    .filter((e) => e.kind === "user")
+    .map((e) => ({ id: e.id, text: String((e.raw as { text?: string })?.text ?? e.title) }));
+  const done = [...(state.doneActions ?? [])];
+  const remaining = [...agentActions, ...codeActions].filter((a) => {
+    if (done.some((d) => overlaps(d.action, a.action, 0.6))) return false; // already listed as done (e.g. by the agent)
+    const by = satisfiedBy(a.action, followUps);
+    if (!by.length) return true;
+    done.push({ action: a.action, evidence: by, source: "code" });
+    return false;
+  });
+  state.doneActions = done;
+  state.nextActions = remaining.sort(
     (x, y) => PHASE_ORDER[x.phase] - PHASE_ORDER[y.phase] || (x.priority ?? "P9").localeCompare(y.priority ?? "P9"),
   );
 
   state.unexplained = unexplainedSignals(state, pa, store);
-  state.consistencyIssues = consistencyIssues(state);
+  state.consistencyIssues = consistencyIssues(state, pa.onset);
+  // One rule for confidence: the brief's overall confidence is the leading hypothesis's.
+  state.overallConfidence = state.hypotheses.find((h) => h.status !== "rejected")?.confidence ?? 0;
 }
