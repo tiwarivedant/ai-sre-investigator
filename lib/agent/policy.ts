@@ -6,10 +6,11 @@ import type { InvestigationUpdate } from "./schemas";
  * Calibration policy, enforced in code on every update the agent writes.
  * The model proposes; these rules decide what is allowed to stand.
  *
- * 1. Only a human can confirm. A hypothesis may be "confirmed", or exceed
- *    MAX_UNCONFIRMED_CONFIDENCE, only if it cites human-provided evidence
- *    (USER-xxx, pasted in a follow-up such as the change owner's statement).
- *    Even then it stays at or below MAX_UNVERIFIED_CONFIDENCE until a human
+ * 1. Only a human can confirm. A hypothesis may be "confirmed" only if it cites
+ *    human-provided evidence (USER-xxx, pasted in a follow-up such as the change
+ *    owner's statement), and only a confirmed one may exceed MAX_UNCONFIRMED_CONFIDENCE:
+ *    citing a follow-up about something else (e.g. customer impact) does not lift the cap.
+ *    Even a confirmed one stays at or below MAX_UNVERIFIED_CONFIDENCE until a human
  *    reports that the fix restored service (recoveryEvidence): an admitted
  *    change is strong evidence, a recovery after reverting it is proof.
  * 2. Action risk comes from a fixed rubric over the action type, escalated by
@@ -111,6 +112,12 @@ function recoveryVerified(h: { recoveryEvidence?: string[] }): boolean {
   return (h.recoveryEvidence ?? []).some((id) => HUMAN_EVIDENCE.test(id));
 }
 
+/** The highest confidence a hypothesis may hold, by how far a human has confirmed it (rule 1). */
+export function confidenceCap(h: { status: string; recoveryEvidence?: string[] }): number {
+  if (h.status !== "confirmed") return MAX_UNCONFIRMED_CONFIDENCE;
+  return recoveryVerified(h) ? 1 : MAX_UNVERIFIED_CONFIDENCE;
+}
+
 type H = NonNullable<InvestigationUpdate["hypotheses"]>[number];
 
 // --- Compound actions -------------------------------------------------------
@@ -163,21 +170,19 @@ export function applyPolicy(
   if (out.hypotheses) {
     out.hypotheses = out.hypotheses.map((h) => {
       const humanBacked = h.supporting.some((id) => HUMAN_EVIDENCE.test(id));
-      if (humanBacked) {
-        if (!recoveryVerified(h) && h.confidence > MAX_UNVERIFIED_CONFIDENCE) {
-          adjustments.push(`${h.id}: confidence ${h.confidence} capped at ${MAX_UNVERIFIED_CONFIDENCE} until a human reports recovery after the fix (recoveryEvidence)`);
-          return { ...h, confidence: MAX_UNVERIFIED_CONFIDENCE };
-        }
-        return h;
-      }
       let next = h;
-      if (h.status === "confirmed") {
+      if (h.status === "confirmed" && !humanBacked) {
         next = { ...next, status: "active" };
         adjustments.push(`${h.id}: "confirmed" requires human confirmation (cite USER- evidence); kept as active`);
       }
-      if (h.status !== "rejected" && h.confidence > MAX_UNCONFIRMED_CONFIDENCE) {
-        next = { ...next, confidence: MAX_UNCONFIRMED_CONFIDENCE };
-        adjustments.push(`${h.id}: confidence ${h.confidence} capped at ${MAX_UNCONFIRMED_CONFIDENCE} without human confirmation`);
+      const cap = confidenceCap(next);
+      if (next.status !== "rejected" && next.confidence > cap) {
+        adjustments.push(
+          `${h.id}: confidence ${h.confidence} capped at ${cap} ${
+            next.status === "confirmed" ? "until a human reports recovery after the fix (recoveryEvidence)" : "without human confirmation"
+          }`,
+        );
+        next = { ...next, confidence: cap };
       }
       return next;
     });

@@ -3,7 +3,7 @@ import type { PreAnalysis } from "@/lib/analysis/preAnalysis";
 import { Bm25Index, tokenize } from "@/lib/retrieval/bm25";
 import { cleanFollowUp } from "@/lib/text";
 import { checkCoverage, whatToProvide } from "@/lib/analysis/coverage";
-import { assessRisk } from "./policy";
+import { assessRisk, confidenceCap } from "./policy";
 import { evidenceFollowUps, followUpClasses, isStatusOnly } from "@/lib/analysis/followups";
 import { responderTexts, suspectChanges, untestedSuspects } from "@/lib/analysis/suspects";
 import type { ContributingFactor, InvestigationState, NextAction, RepeatIncident, SimilarIncident, TimelineEntry } from "@/lib/types";
@@ -551,6 +551,8 @@ export function refreshDerived(state: InvestigationState, pa: PreAnalysis, store
 
   // Recovery is read from the human's report, not left to the agent to tag (it often cites it only as support).
   state.hypotheses = attachRecovery(state.hypotheses, recoveryReports(store));
+  // The confirmation caps hold on every path (saved states, actions), not only on agent updates.
+  state.hypotheses = state.hypotheses.map((h) => (h.status !== "rejected" && h.confidence > confidenceCap(h) ? { ...h, confidence: confidenceCap(h) } : h));
 
   // Nothing in the data covers the reported symptom: no hypothesis may claim much about it.
   if (insufficient)

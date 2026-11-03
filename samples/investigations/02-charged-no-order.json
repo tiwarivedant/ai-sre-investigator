@@ -184,7 +184,7 @@
       {
         "id": "H1",
         "statement": "CFG-502 raised inventory pool to 80 x6 replicas, exhausting orders-db connections; orders-service failed to create orders after payment auth, leaving holds",
-        "confidence": 0.86,
+        "confidence": 0.85,
         "status": "active",
         "supporting": [
           "CFG-502",
@@ -302,7 +302,7 @@
       }
     ],
     "stakeholderUpdate": "Some customers saw checkout errors, and 14 reported being charged without an order. Payments confirms these are temporary holds, not completed charges, and they release automatically in 3-5 days. The likely cause is a settings change that let one service use too many database connections, blocking order creation. We are reverting that setting. Next update in 30 minutes.",
-    "overallConfidence": 0.86,
+    "overallConfidence": 0.85,
     "trace": [
       {
         "step": 1,
@@ -539,10 +539,8 @@
         "at": "2026-11-02T20:01:50.480Z",
         "trigger": "follow-up USER-001: Payments confirms 14 duplicate holds, auto-release in 3–5 days.",
         "changes": [
-          "H1 confidence 85% -> 86%",
           "H1 new supporting evidence: USER-001",
           "H2 confidence 8% -> 5%",
-          "overall confidence 85% -> 86%",
           "open questions: 1 resolved, 2 new",
           "4 new next actions"
         ]

@@ -150,6 +150,21 @@ describe("unexplained signals", () => {
   });
 });
 
+describe("confidence caps on every path", () => {
+  it("re-applies the confirmation caps to stored hypotheses, and overall confidence follows", () => {
+    const s = derive({
+      hypotheses: [
+        h({ confidence: 0.86, supporting: ["CFG-502", "USER-001"] }), // active, cites a follow-up
+        h({ id: "H2", statement: "payments deploy DEP-102", status: "rejected", confidence: 0.05, supporting: ["DEP-102"] }),
+      ],
+    });
+    expect(s.hypotheses[0].confidence).toBe(0.85);
+    expect(s.overallConfidence).toBe(0.85);
+    // A confirmed hypothesis may go higher, but not past 0.95 without a recovery report.
+    expect(derive({ hypotheses: [h({ status: "confirmed", confidence: 0.99, supporting: ["CFG-502", "USER-001"] })] }).hypotheses[0].confidence).toBe(0.95);
+  });
+});
+
 describe("live run with two follow-ups (owner confirmation, then recovery)", () => {
 
   it("derives key signals from the leading hypothesis when the agent wrote none", () => {

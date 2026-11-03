@@ -6,14 +6,14 @@ _sample-02-charged-no-order · run: **complete** · incident: **investigating** 
 ## Summary
 CFG-502 (inventory DB_POOL_MAX 20->80 at 13:52) overcommitted orders-db (budget 610 vs max 400), exhausting connections (397/400, LOG-076) so orders-service could not create orders after payment authorization. Payments confirms the 14 affected customers have duplicate holds, not completed captures, which auto-release in 3-5 days (USER-001). The cause is still the likely one and not confirmed by the change owner. Recovery not yet verified.
 
-**Overall confidence:** 86%
+**Overall confidence:** 85%
 
 ## Impact
 Onset 13:55. Checkout 5xx up to 7.9%, orders error up to 10.3%; 87 tickets by 14:30 (CUST-001). 14 customers report being charged with no order (CUST-002); payments confirms these are duplicate holds that auto-release in 3-5 days (USER-001). Customers may see held funds for days. All regions (CUST-005).
 
 ## Hypotheses
 
-### H1 · ACTIVE · 86%
+### H1 · ACTIVE · 85%
 CFG-502 raised inventory pool to 80 x6 replicas, exhausting orders-db connections; orders-service failed to create orders after payment auth, leaving holds
 
 - Supporting: `CFG-502` `LOG-076` `LOG-121` `LOG-033` `LOG-040` `MET-orders_db.active_connections` `MET-inventory.db_pool_in_use` `USER-001`
@@ -93,4 +93,4 @@ Payments v2.14.0 caused the issue
 Some customers saw checkout errors, and 14 reported being charged without an order. Payments confirms these are temporary holds, not completed charges, and they release automatically in 3-5 days. The likely cause is a settings change that let one service use too many database connections, blocking order creation. We are reverting that setting. Next update in 30 minutes.
 
 ## Revisions
-- 2026-11-02T20:01:50.480Z (follow-up USER-001: Payments confirms 14 duplicate holds, auto-release in 3–5 days.): H1 confidence 85% -> 86%; H1 new supporting evidence: USER-001; H2 confidence 8% -> 5%; overall confidence 85% -> 86%; open questions: 1 resolved, 2 new; 4 new next actions
+- 2026-11-02T20:01:50.480Z (follow-up USER-001: Payments confirms 14 duplicate holds, auto-release in 3–5 days.): H1 new supporting evidence: USER-001; H2 confidence 8% -> 5%; open questions: 1 resolved, 2 new; 4 new next actions

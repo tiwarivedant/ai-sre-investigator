@@ -29,6 +29,16 @@ describe("confirmation and confidence", () => {
     expect(adjustments).toHaveLength(3);
   });
 
+  it("caps an active hypothesis at 0.85 even when it cites a follow-up (sample 02: a follow-up about impact)", () => {
+    const { update, adjustments } = applyPolicy(
+      { hypotheses: [hyp({ status: "active", confidence: 0.86, supporting: ["CFG-502", "USER-001"] })], overallConfidence: 0.86 },
+      changes,
+    );
+    expect(update.hypotheses![0]).toMatchObject({ status: "active", confidence: MAX_UNCONFIRMED_CONFIDENCE });
+    expect(update.overallConfidence).toBe(MAX_UNCONFIRMED_CONFIDENCE);
+    expect(adjustments[0]).toBe("H1: confidence 0.86 capped at 0.85 without human confirmation");
+  });
+
   it("allows confirmation and high confidence when a human confirmed it (USER- evidence)", () => {
     const { update, adjustments } = applyPolicy(
       { hypotheses: [hyp({ supporting: ["CFG-502", "USER-001"] })], overallConfidence: 0.95 },

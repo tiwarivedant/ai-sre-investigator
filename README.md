@@ -36,7 +36,7 @@ npm run dev:replay
 cp .env.example .env.local
 # set ONE of:
 #   ANTHROPIC_API_KEY=...   (default model: claude-sonnet-5-5)
-#   GEMINI_API_KEY=...      (free tier works, but daily limits are low)
+#   GEMINI_API_KEY=...      (default model: gemini-3.5-flash; free tier works, but daily limits are low)
 # optional: LLM_PROVIDER=anthropic|gemini
 # leave REPLAY unset or 0: REPLAY=1 overrides LLM_PROVIDER
 npm run dev
@@ -47,11 +47,13 @@ A live investigation took about 10 seconds in the eval runs; runs are capped at 
 ### Tests and eval
 
 ```bash
-npm test                 # 150 unit tests
-npm run test:e2e         # 11 Playwright e2e tests in replay mode, no key needed (uses your installed Google Chrome)
+npm test                 # 154 unit tests
+npm run test:e2e         # 12 Playwright e2e tests in replay mode, no key needed
 npm run eval -- --runs 3 # live eval against the answer key
 REPLAY=1 npm run eval    # eval against the recorded fixture, no key
 ```
+
+Playwright uses its bundled Chromium; run `npx playwright install chromium` once. To use your installed Google Chrome instead, set `PW_CHANNEL=chrome`.
 
 ---
 
@@ -67,7 +69,7 @@ The dataset (`data/`) is small but deliberately messy:
 - **Memory:** a past incident (`INC-2041`) had the *same* failure, and its action items (PgBouncer, a pool-size guardrail) are still open. A decoy past incident (`INC-1987`) is one where a payments deploy really was the cause.
 - **Customer impact:** 87 tickets, including 14 "charged but no order" reports.
 
-![Timeline: the payments deploy is 15 min before onset; the config change is 3 min before](samples/screenshots/02-timeline-chart.png)
+![The payments deploy starts 15 min before onset (100% at 13:47); the config change lands 3 min before.](samples/screenshots/02-timeline-chart.png)
 
 | Input | IDs |
 |---|---|

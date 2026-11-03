@@ -2,7 +2,7 @@ import { ApiError, GoogleGenAI, ThinkingLevel, type Content, type GenerateConten
 import { isRetryableStatus, withRetry, type RetryableInfo } from "./retry";
 import type { ChatSession, ModelTurn, SendOptions, SessionConfig, StopReason, ToolResult } from "./types";
 
-export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
 
 /** Interface subset of GoogleGenAI used here, so tests can inject a fake. */
 export interface GeminiClient {

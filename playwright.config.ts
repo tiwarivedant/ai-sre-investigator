@@ -16,7 +16,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: `http://localhost:${PORT}`,
-    channel: "chrome", // the installed Google Chrome; no browser download needed
+    // Playwright's bundled Chromium by default (`npx playwright install chromium` once).
+    // PW_CHANNEL=chrome uses an installed Google Chrome instead.
+    channel: process.env.PW_CHANNEL || undefined,
     viewport: { width: 1440, height: 900 },
     trace: "retain-on-failure",
   },
