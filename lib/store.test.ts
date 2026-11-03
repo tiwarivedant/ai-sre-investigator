@@ -18,7 +18,7 @@ describe("samples", () => {
   beforeAll(() => {
     const src = JSON.parse(fs.readFileSync(path.join(process.cwd(), "notes/before-fixes/inv-20261102191424-c914d0.json"), "utf8"));
     fs.mkdirSync(SAMPLES_DIR, { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ ...src, state: { ...src.state, id: `sample-${NAME}` }, history: [], sample: true }));
+    fs.writeFileSync(file, JSON.stringify({ ...src, state: { ...src.state, id: `sample-${NAME}` }, history: [], sample: true, label: "Test sample" }));
   });
   afterAll(() => {
     fs.rmSync(file, { force: true });
@@ -29,7 +29,7 @@ describe("samples", () => {
   it("are listed separately and load as read-only", () => {
     const { samples, recent } = listInvestigations();
     const mine = samples.find((s) => s.id === `sample-${NAME}`)!;
-    expect(mine).toMatchObject({ sample: true, followUps: 1 });
+    expect(mine).toMatchObject({ sample: true, followUps: 1, label: "Test sample" });
     expect(mine.topHypothesis).toMatchObject({ id: "H1", status: "confirmed" });
     expect(recent.some((s) => s.sample)).toBe(false);
 

@@ -41,7 +41,8 @@ export function InvestigationRow({ inv, active, onOpen }: { inv: InvestigationSu
       aria-current={active || undefined}
       className={`w-full rounded-md border px-3 py-2 text-left transition-colors ${active ? "border-zinc-500 bg-zinc-800/70" : "border-transparent hover:border-zinc-700 hover:bg-zinc-800/40"}`}
     >
-      <p className="line-clamp-2 text-sm text-zinc-200">{inv.incidentInput}</p>
+      {inv.label && <p className="text-sm font-medium text-zinc-100">{inv.label}</p>}
+      <p className={inv.label ? "line-clamp-2 text-xs text-zinc-400" : "line-clamp-2 text-sm text-zinc-200"}>{inv.incidentInput}</p>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
         <IncidentStatusBadge status={inv.incidentStatus} />
         {inv.status !== "complete" && <RunStatus status={inv.status} />}

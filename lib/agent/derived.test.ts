@@ -157,6 +157,10 @@ describe("live run with two follow-ups (owner confirmation, then recovery)", () 
     expect(s.keySignals.length).toBeGreaterThan(0);
     expect(s.keySignals.every((k) => k.source === "code")).toBe(true);
     expect(s.keySignals.map((k) => k.evidenceId)).toEqual(s.hypotheses[0].supporting.slice(0, 6));
+    // A follow-up that is only a status word ("resolved") is not a signal, even when the hypothesis cites it.
+    const lead = run.hypotheses[0];
+    const withStatus = deriveRun({ hypotheses: [{ ...lead, supporting: ["USER-003", ...lead.supporting] }, run.hypotheses[1]] }, "resolved");
+    expect(withStatus.keySignals.map((k) => k.evidenceId)).toEqual(lead.supporting.slice(0, 6));
     const metric = deriveRun({ hypotheses: [{ ...run.hypotheses[0], supporting: ["MET-orders_db.active_connections", ...run.hypotheses[0].supporting] }, run.hypotheses[1]] });
     expect(metric.keySignals[0].why).toMatch(/^Rose 244\.5 -> 331/);
     expect(metric.timeline.find((t) => t.evidenceId === "MET-orders_db.active_connections")!.note).toMatch(/^Rose/);

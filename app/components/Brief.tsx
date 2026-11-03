@@ -248,9 +248,9 @@ export function Brief({
               {chart && chart.series.length > 0 && <IncidentChart data={chart} />}
               <ol className="space-y-1">
                 {state.timeline.map((t, i) => (
-                  <li key={`${t.evidenceId}-${i}`} className="grid grid-cols-[3.75rem_minmax(0,1fr)] items-baseline gap-2 text-sm">
+                  <li key={`${t.evidenceId}-${i}`} className="grid grid-cols-[4rem_minmax(0,1fr)] items-baseline gap-2 text-sm">
                     {t.evidenceId.startsWith("USER-") ? (
-                      <span className="text-[10px] font-semibold tracking-wide text-yellow-300/80 uppercase" title={`Sent ${new Date(t.ts).toLocaleString()}`}>
+                      <span className="text-[10px] font-medium whitespace-nowrap text-yellow-300/80" title={`Sent ${new Date(t.ts).toLocaleString()}`}>
                         follow-up
                       </span>
                     ) : (
@@ -269,7 +269,7 @@ export function Brief({
           <div className="grid gap-3 md:grid-cols-2">
             <Section title="Key signals">
               {state.keySignals.length > 0 && state.keySignals.every((k) => k.source === "code") && (
-                <p className="mb-2 text-xs text-zinc-500">The agent listed none; showing the leading hypothesis&apos;s evidence.</p>
+                <p className="mb-1.5 text-[11px] text-zinc-600 italic">From leading hypothesis</p>
               )}
               <SignalList items={state.keySignals} empty="None recorded." />
             </Section>

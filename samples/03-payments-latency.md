@@ -1,7 +1,7 @@
 # Investigation brief
 _sample-03-payments-latency · run: **complete** · incident: **investigating** · updated 2026-11-02T20:03:31.232Z_
 
-> Payments team says their latency went up around 14:00. Is payments broken?”
+> Payments team says their latency went up around 14:00. Is payments broken?
 
 ## Summary
 Payments is not the cause. CFG-502 (inventory DB_POOL_MAX 20->80 at 13:52) over-committed orders-db (610 potential vs 400 max); inventory holds ~320 connections (LOG-076, LOG-121), starving orders-service ("too many clients"), causing checkout errors. Payments latency is a secondary effect of checkout retries (LOG-046); the rollback DEP-103 was a red herring and the 5xx alert persists after it (ALR-014).

@@ -133,11 +133,6 @@
         "source": "code"
       },
       {
-        "evidenceId": "USER-003",
-        "why": "resolved",
-        "source": "code"
-      },
-      {
         "evidenceId": "CFG-502",
         "why": "Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80",
         "source": "code"
@@ -150,6 +145,11 @@
       {
         "evidenceId": "LOG-121",
         "why": "LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400",
+        "source": "code"
+      },
+      {
+        "evidenceId": "MET-payments.p95_latency_ms",
+        "why": "Rose 416.25 -> 640 (peak 650), recovered 14:20",
         "source": "code"
       }
     ],
@@ -788,5 +788,6 @@
     }
   ],
   "sample": true,
-  "recordedFrom": "anthropic/claude-sonnet-5-5"
+  "recordedFrom": "anthropic/claude-sonnet-5-5",
+  "label": "Full lifecycle: checkout incident"
 }

@@ -28,6 +28,7 @@ test.describe.serial("investigation lifecycle (replay)", () => {
     await expect(page.getByText("Recorded sample (replay mode)")).toBeVisible();
     await expect(page.getByRole("button", { name: INCIDENT, exact: true })).toBeVisible();
     await expect(page.locator("main").getByText("Sample", { exact: true })).toHaveCount(5);
+    await expect(page.locator("main").getByText("No evidence: Kafka lag", { exact: true })).toBeVisible();
   });
 
   test("a non-matching prompt shows the replay notice instead of running", async () => {
@@ -121,10 +122,17 @@ test.describe.serial("investigation lifecycle (replay)", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("the header title goes back to the start screen", async () => {
+    await page.getByRole("button", { name: "Incident Investigator" }).click();
+    await expect(page.getByRole("heading", { name: "What are responders seeing?" })).toBeVisible();
+  });
+
   test("samples are read-only", async () => {
     await page.getByRole("button", { name: /^Investigations/ }).click();
     await page.getByRole("button", { name: /Customers are seeing errors at checkout[\s\S]*Sample/ }).first().click();
     await expect(page.getByText("Samples are read-only. Run your own investigation to send follow-ups.")).toBeVisible();
+    // The incident bar shows the sample's title above its prompt.
+    await expect(page.locator("main").getByText("Full lifecycle: checkout incident", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Resolve", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Add note" })).toHaveCount(0);
   });

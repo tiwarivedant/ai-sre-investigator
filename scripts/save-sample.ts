@@ -2,7 +2,7 @@
  * Publish a saved investigation as a read-only sample (browsable without an API key).
  *
  *   npm run save-sample -- latest --name inc-2213-confirmed
- *   npm run save-sample -- <id> --name inc-2213-rate-limited
+ *   npm run save-sample -- <id> --name inc-2213-rate-limited --label "Rate limited"
  *
  * Writes samples/investigations/<name>.json with id "sample-<name>". The model
  * conversation is dropped: samples are never resumed.
@@ -15,7 +15,9 @@ import { loadFixture } from "@/lib/llm/replay";
 const args = process.argv.slice(2);
 const nameIdx = args.indexOf("--name");
 const name = nameIdx >= 0 ? args[nameIdx + 1] : undefined;
-const target = args.find((a, i) => !a.startsWith("--") && i !== nameIdx + 1) ?? "latest";
+const labelIdx = args.indexOf("--label");
+const label = labelIdx >= 0 ? args[labelIdx + 1]?.trim() || undefined : undefined;
+const target = args.find((a, i) => !a.startsWith("--") && i !== nameIdx + 1 && i !== labelIdx + 1) ?? "latest";
 if (!name || !/^[a-z0-9][a-z0-9-]*$/.test(name)) {
   console.error("Usage: npm run save-sample -- <id|latest> --name <kebab-case-name>");
   process.exit(1);
@@ -45,6 +47,7 @@ const sample: StoredInvestigation = {
   history: [],
   sample: true,
   recordedFrom,
+  label,
 };
 fs.mkdirSync(SAMPLES_DIR, { recursive: true });
 const file = path.join(SAMPLES_DIR, `${name}.json`);

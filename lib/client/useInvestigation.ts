@@ -20,6 +20,8 @@ export interface RunInfo {
   /** Shipped read-only example. */
   sample?: boolean;
   recordedFrom?: string;
+  /** Samples' display title. */
+  label?: string;
 }
 
 /**
@@ -44,9 +46,9 @@ export function useInvestigation() {
     setRunning(true);
 
     es.addEventListener("snapshot", (ev) => {
-      const d = JSON.parse((ev as MessageEvent).data) as { state: InvestigationState; provider: string; model: string; sample?: boolean; recordedFrom?: string };
+      const d = JSON.parse((ev as MessageEvent).data) as { state: InvestigationState; provider: string; model: string; sample?: boolean; recordedFrom?: string; label?: string };
       setState(d.state);
-      setInfo({ provider: d.provider, model: d.model, sample: d.sample, recordedFrom: d.recordedFrom });
+      setInfo({ provider: d.provider, model: d.model, sample: d.sample, recordedFrom: d.recordedFrom, label: d.label });
       // Re-attaching to a run already in progress (e.g. after a refresh): approximate its start.
       if (d.state.status === "running")
         setProgress(

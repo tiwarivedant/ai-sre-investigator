@@ -5,6 +5,7 @@ import { markRunning, publish } from "@/lib/runs";
 import { listInvestigations } from "@/lib/store";
 import { loadFixture } from "@/lib/llm/replay";
 import { fixtureLabel, matchesRecordedIncident, REPLAY_MISMATCH, replayMismatchMessage } from "@/lib/replayGuard";
+import { cleanFollowUp } from "@/lib/text";
 
 export const runtime = "nodejs";
 
@@ -16,7 +17,7 @@ export async function GET() {
 /** Start an investigation. Returns its id as soon as it exists; progress streams over SSE. */
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as { incident?: string };
-  const incident = body.incident?.trim();
+  const incident = body.incident ? cleanFollowUp(body.incident) : "";
   if (!incident) return NextResponse.json({ error: "incident is required" }, { status: 400 });
   if (incident.length > 4000) return NextResponse.json({ error: "incident text is too long (max 4000 chars)" }, { status: 400 });
 

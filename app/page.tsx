@@ -100,6 +100,14 @@ export default function Home() {
     },
     [load],
   );
+  // Back to the empty state (New investigation, or the title in the header).
+  const goHome = () => {
+    reset();
+    setIncident(freshIncident());
+    setMessage("");
+    setFollowUpBlocked(false);
+    setReplayBlocked(false);
+  };
   // Why follow-ups are unavailable for the loaded investigation, if they are.
   const followUpLocked = info?.sample
     ? readOnlyMessage()
@@ -112,8 +120,18 @@ export default function Home() {
       <div className="flex min-h-screen flex-col">
         <header className="sticky top-0 z-40 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
           <div className="mx-auto flex max-w-[1600px] items-center gap-3 px-4 py-2.5">
-            <div className="size-2 rounded-full bg-emerald-400" />
-            <h1 className="text-sm font-semibold tracking-tight whitespace-nowrap">Incident Investigator</h1>
+            <h1 className="text-sm font-semibold tracking-tight whitespace-nowrap">
+              <button
+                type="button"
+                disabled={running}
+                onClick={goHome}
+                title={running ? "Available when the agent finishes" : "Back to the start screen"}
+                className="flex items-center gap-3 rounded hover:text-white disabled:cursor-not-allowed"
+              >
+                <span className="size-2 rounded-full bg-emerald-400" />
+                Incident Investigator
+              </button>
+            </h1>
             <span className="hidden text-xs text-zinc-500 sm:inline">evidence-cited briefs</span>
             <div className="ml-auto flex min-w-0 items-center gap-2 text-[11px]">
               <HistoryMenu activeId={state?.id} onOpen={openInvestigation} />
@@ -147,19 +165,16 @@ export default function Home() {
                   Sample
                 </span>
               )}
-              <p className="min-w-0 flex-1 truncate text-sm text-zinc-300" title={state.incidentInput}>
-                {state.incidentInput}
-              </p>
+              <div className="min-w-0 flex-1">
+                {info?.label && <p className="truncate text-sm font-medium text-zinc-100">{info.label}</p>}
+                <p className={`truncate ${info?.label ? "text-xs text-zinc-400" : "text-sm text-zinc-300"}`} title={state.incidentInput}>
+                  {state.incidentInput}
+                </p>
+              </div>
               <button
                 type="button"
                 disabled={running}
-                onClick={() => {
-                  reset();
-                  setIncident(freshIncident());
-                  setMessage("");
-                  setFollowUpBlocked(false);
-                  setReplayBlocked(false);
-                }}
+                onClick={goHome}
                 className="shrink-0 rounded-md border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 New investigation

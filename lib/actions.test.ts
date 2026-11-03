@@ -96,6 +96,16 @@ describe("responder actions (no model call)", () => {
   });
 });
 
+describe("incident text", () => {
+  it("drops stray quotes around the incident text when a run starts", async () => {
+    const f = loadFixture();
+    const state = await startInvestigation(`“${f.incidentInput}”`, { session: new ReplaySession(f, undefined, 0) });
+    created.push(state.id);
+    expect(state.incidentInput).toBe(f.incidentInput);
+    expect(loadInvestigation(state.id)!.state.incidentInput).toBe(f.incidentInput);
+  });
+});
+
 describe("Stop", () => {
   it("ends the run at once, keeps the brief so far, and marks it partial", async () => {
     const f = loadFixture();

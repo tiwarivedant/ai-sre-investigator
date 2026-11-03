@@ -22,6 +22,8 @@ export interface StoredInvestigation {
   sample?: boolean;
   /** For samples: where the recorded model turns came from. */
   recordedFrom?: string;
+  /** For samples: a short display title shown above the prompt ("No evidence: Kafka lag"). */
+  label?: string;
   /** USER- evidence recorded by actions (notes, resolve, reopen) that the agent hasn't been shown yet. */
   undeliveredNotes?: string[];
 }
@@ -36,6 +38,8 @@ export interface InvestigationSummary {
   provider: ProviderName;
   model: string;
   sample: boolean;
+  /** Samples' display title. */
+  label?: string;
   briefSource?: InvestigationState["briefSource"];
   incidentStatus?: InvestigationState["incidentStatus"];
   /** Not resolved (and not a finished sample). */
@@ -103,6 +107,7 @@ export function summarize(inv: StoredInvestigation): InvestigationSummary {
     provider: inv.provider,
     model: inv.model,
     sample: !!inv.sample,
+    label: inv.label,
     briefSource: s.briefSource,
     incidentStatus: s.incidentStatus,
     open: s.incidentStatus !== "resolved",

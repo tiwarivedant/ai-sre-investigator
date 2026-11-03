@@ -63,7 +63,8 @@ export interface StartOptions extends Partial<Pick<AgentRunOptions, "maxSteps" |
   session?: ChatSession;
 }
 
-export async function startInvestigation(incidentInput: string, opts: StartOptions = {}): Promise<InvestigationState> {
+export async function startInvestigation(rawIncident: string, opts: StartOptions = {}): Promise<InvestigationState> {
+  const incidentInput = cleanFollowUp(rawIncident);
   const state = newInvestigationState(incidentInput);
   const ctx = buildContext(state, opts.dataDir);
   const maxSteps = opts.maxSteps ?? INITIAL_BUDGET.maxSteps;

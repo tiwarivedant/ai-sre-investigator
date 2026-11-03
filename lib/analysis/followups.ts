@@ -38,6 +38,13 @@ export function classifyFollowUp(text: string): FollowUpClass {
   return { kind: "evidence", reason: "an observation or reported action" };
 }
 
+// A bare lifecycle word ("resolved", "mitigated.", "all clear"): it moves the status, but says nothing worth listing as a signal.
+const STATUS_ONLY = /^(resolved|mitigated|fixed|recovered|closed|done|stable|all (clear|good)|ok(ay)?|back to normal)[.!]*$/i;
+
+export function isStatusOnly(text: string): boolean {
+  return STATUS_ONLY.test(text.trim());
+}
+
 const textOf = (raw: unknown, title: string) => String((raw as { text?: string })?.text ?? title);
 
 /** Classification of every USER- follow-up in the store. */

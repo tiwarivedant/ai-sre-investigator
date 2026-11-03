@@ -4,7 +4,7 @@ import { Bm25Index, tokenize } from "@/lib/retrieval/bm25";
 import { cleanFollowUp } from "@/lib/text";
 import { checkCoverage, whatToProvide } from "@/lib/analysis/coverage";
 import { assessRisk } from "./policy";
-import { evidenceFollowUps, followUpClasses } from "@/lib/analysis/followups";
+import { evidenceFollowUps, followUpClasses, isStatusOnly } from "@/lib/analysis/followups";
 import { responderTexts, suspectChanges, untestedSuspects } from "@/lib/analysis/suspects";
 import type { ContributingFactor, InvestigationState, NextAction, RepeatIncident, SimilarIncident, TimelineEntry } from "@/lib/types";
 
@@ -569,7 +569,10 @@ export function refreshDerived(state: InvestigationState, pa: PreAnalysis, store
   const agentSignals = state.keySignals.filter((k) => k.source !== "code");
   state.keySignals = agentSignals.length
     ? agentSignals
-    : (lead?.supporting ?? []).slice(0, 6).map((id) => ({ evidenceId: id, why: describeEvidence(id, pa, store), source: "code" as const }));
+    : (lead?.supporting ?? [])
+        .filter((id) => !(id.startsWith("USER-") && isStatusOnly(cleanFollowUp(String((store.get(id)?.raw as { text?: string })?.text ?? "")))))
+        .slice(0, 6)
+        .map((id) => ({ evidenceId: id, why: describeEvidence(id, pa, store), source: "code" as const }));
 
   // Timeline: every event the brief relies on, times from the evidence (never the model).
   state.timeline = buildBriefTimeline(state, pa, store);

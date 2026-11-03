@@ -28,7 +28,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         controller.close();
       };
 
-      send("snapshot", { state: inv.state, provider: inv.provider, model: inv.model, sample: !!inv.sample, recordedFrom: inv.recordedFrom });
+      send("snapshot", { state: inv.state, provider: inv.provider, model: inv.model, sample: !!inv.sample, recordedFrom: inv.recordedFrom, label: inv.label });
       if (!isRunning(id)) {
         send("done", { state: inv.state });
         return close();

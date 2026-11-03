@@ -61,10 +61,10 @@ Payments v2.14.0 caused the problem
 ## Key signals
 - `USER-001` Marcus confirms he changed DB_POOL_MAX from 20 to 80 at 13:52.
 - `USER-002` Reverted DB_POOL_MAX to 20 at 14:35. orders-db connections back to 250, checkout errors at 0.3%.
-- `USER-003` resolved
 - `CFG-502` Config inventory-service (config-service, by mlee): DB_POOL_MAX: 20 -> 80
 - `LOG-076` LOG orders-db: connections: inventory_svc=318 orders_svc=64 reporting_svc=12 superuser=3 total=397/400
 - `LOG-121` LOG orders-db: connections: inventory_svc=320 orders_svc=63 reporting_svc=11 superuser=3 total=397/400
+- `MET-payments.p95_latency_ms` Rose 416.25 -> 640 (peak 650), recovered 14:20
 
 ## Noise (ruled out)
 - `ALR-001` _heuristic: outside blast radius, preceded onset_

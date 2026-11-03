@@ -618,5 +618,6 @@
     }
   ],
   "sample": true,
-  "recordedFrom": "anthropic/claude-sonnet-5-5"
+  "recordedFrom": "anthropic/claude-sonnet-5-5",
+  "label": "Charged but no order"
 }

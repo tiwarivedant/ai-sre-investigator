@@ -1,5 +1,5 @@
 /**
- * Clean follow-up text as typed or pasted: trim whitespace and stray wrapping
+ * Clean incident or follow-up text as typed or pasted: trim whitespace and stray wrapping
  * quotes ('...', "...", “...”, ‘...’) left by shells and chat clients.
  */
 export function cleanFollowUp(text: string): string {

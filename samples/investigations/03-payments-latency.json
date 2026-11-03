@@ -1,7 +1,7 @@
 {
   "state": {
     "id": "sample-03-payments-latency",
-    "incidentInput": "Payments team says their latency went up around 14:00. Is payments broken?”",
+    "incidentInput": "Payments team says their latency went up around 14:00. Is payments broken?",
     "createdAt": "2026-11-02T20:03:18.649Z",
     "updatedAt": "2026-11-02T20:03:31.232Z",
     "status": "complete",
@@ -469,5 +469,6 @@
   "history": [],
   "userEvidence": [],
   "sample": true,
-  "recordedFrom": "anthropic/claude-sonnet-5-5"
+  "recordedFrom": "anthropic/claude-sonnet-5-5",
+  "label": "Symptom vs. cause: payments latency"
 }

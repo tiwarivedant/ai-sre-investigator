@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyFollowUp } from "./followups";
+import { classifyFollowUp, isStatusOnly } from "./followups";
 
 const kind = (t: string) => classifyFollowUp(t).kind;
 
@@ -21,5 +21,12 @@ describe("classifyFollowUp", () => {
     expect(kind("Dana says payments error rate is 0.2%, flat all day")).toBe("evidence"); // a statement, but an observation
     expect(kind("Support says customers were charged but have no order.")).toBe("evidence");
     expect(kind("resolved")).toBe("evidence");
+  });
+});
+
+describe("isStatusOnly", () => {
+  it("matches a bare lifecycle word, not a report with content", () => {
+    for (const t of ["resolved", "Resolved.", " mitigated ", "all clear", "back to normal"]) expect(isStatusOnly(t)).toBe(true);
+    for (const t of ["resolved after the 14:35 revert", "Reverted DB_POOL_MAX to 20 at 14:35", "not resolved"]) expect(isStatusOnly(t)).toBe(false);
   });
 });
