@@ -222,7 +222,7 @@ All samples are from live runs (`claude-sonnet-5-5`). Each is in `samples/` as M
 
 **Results (claude-sonnet-5-5):**
 - Initial: **2/3 runs** passed all checks. One run never tested the payments deploy.
-- After adding the finalize gate: **3/3 runs**. The suspect list in the pre-analysis was enough; none of the three runs needed the finalize reminder.
+- After adding suspect-change detection and a finalize gate: **3/3 runs**. In all three, the agent tested DEP-102 before finalizing, so the gate's reminder never fired; it stays as a safety net. Three runs can't separate the effect of listing suspects in the pre-analysis from run-to-run variation.
 
 **What the eval doesn't prove:** checks 4 and 5 mostly exercise the deterministic layer (noise heuristics, retrieval), not the agent, which is by design. It's also one scenario with three runs; it shows consistency here, not general accuracy.
 
