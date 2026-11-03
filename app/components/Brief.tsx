@@ -8,8 +8,17 @@ import { IncidentChart, useChartData } from "./IncidentChart";
 import { whatToProvide, type Coverage } from "@/lib/analysis/coverage";
 import { Chips, confidenceWord, ConfidenceBar, EvidenceChip, HypothesisStatus, RichText, RiskBadge, RunStatus, Section } from "./ui";
 
-export function Brief({ state, changed, onQuestion }: { state: InvestigationState; changed: Set<string>; onQuestion: (q: string) => void }) {
+export function Brief({
+  state,
+  changed,
+  onQuestion,
+}: {
+  state: InvestigationState;
+  changed: Set<string>;
+  onQuestion: (q: string) => void;
+}) {
   const empty = !state.summary && state.hypotheses.length === 0;
+  const running = state.status === "running";
   const now = state.nextActions.filter((a) => a.phase === "now");
   const later = state.nextActions.filter((a) => a.phase === "after_recovery");
   const prevention = state.nextActions.filter((a) => a.phase === "prevention");
@@ -46,10 +55,15 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
         </div>
       )}
 
-      {empty ? (
-        <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-10 text-center text-sm text-zinc-500">
-          {state.status === "running" ? "The agent is gathering evidence. The brief appears here as soon as it writes one." : "No brief was written."}
+      {empty && running ? (
+        <div className="space-y-3" data-testid="brief-skeleton">
+          <SkeletonSection title="Summary" lines={3} />
+          <SkeletonSection title="Hypotheses" cards={2} />
+          <SkeletonSection title="Next actions" lines={3} />
+          <SkeletonSection title="Timeline (UTC)" lines={4} />
         </div>
+      ) : empty ? (
+        <div className="rounded-lg border border-dashed border-zinc-800 px-4 py-10 text-center text-sm text-zinc-500">No brief was written.</div>
       ) : (
         <>
           {state.briefSource === "pre-analysis" && (
@@ -88,6 +102,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
             </div>
           )}
 
+          {state.hypotheses.length === 0 && running && <SkeletonSection title="Hypotheses" cards={2} />}
           {state.hypotheses.length > 0 && (
             <Section title={`Hypotheses (${state.hypotheses.length})`}>
               <div className="space-y-2">
@@ -164,6 +179,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
             </Section>
           )}
 
+          {state.nextActions.length === 0 && running && <SkeletonSection title="Next actions" lines={3} />}
           {(now.length > 0 || later.length > 0 || prevention.length > 0 || (state.doneActions?.length ?? 0) > 0) && (
             <Section title="Next actions">
               <ActionList actions={now} />
@@ -220,6 +236,7 @@ export function Brief({ state, changed, onQuestion }: { state: InvestigationStat
             </Section>
           )}
 
+          {state.timeline.length === 0 && running && <SkeletonSection title="Timeline (UTC)" lines={4} />}
           {state.timeline.length > 0 && (
             <Section title="Timeline (UTC)">
               {chart && chart.series.length > 0 && <IncidentChart data={chart} />}
@@ -490,7 +507,7 @@ function Verdict({ state }: { state: InvestigationState }) {
         <RunStatus status={state.status} />
         <span className="min-w-0 truncate font-mono text-[11px] text-zinc-500">{state.id}</span>
         <div className="ml-auto">
-          <ExportButton state={state} />
+
         </div>
       </header>
       <div className="px-4 py-3">
@@ -618,7 +635,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function ExportButton({ state }: { state: InvestigationState }) {
+export function ExportButton({ state }: { state: InvestigationState }) {
   return (
     <button
       type="button"
@@ -633,5 +650,29 @@ function ExportButton({ state }: { state: InvestigationState }) {
     >
       Export Markdown
     </button>
+  );
+}
+
+/** Placeholder for a section the agent hasn't written yet (shown while it runs). */
+function SkeletonSection({ title, lines = 0, cards = 0 }: { title: string; lines?: number; cards?: number }) {
+  return (
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/40" aria-busy="true" aria-label={`${title} (being written)`}>
+      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
+        <h2 className="text-[11px] font-semibold tracking-wider text-zinc-600 uppercase">{title}</h2>
+        <span className="text-[10px] text-zinc-600">being written…</span>
+      </header>
+      <div className="animate-pulse space-y-2 px-4 py-3">
+        {Array.from({ length: lines }, (_, i) => (
+          <div key={i} className="h-3 rounded bg-zinc-800" style={{ width: `${[92, 78, 85, 64][i % 4]}%` }} />
+        ))}
+        {Array.from({ length: cards }, (_, i) => (
+          <div key={i} className="space-y-2 rounded-md border border-zinc-800 p-3">
+            <div className="h-3 w-1/3 rounded bg-zinc-800" />
+            <div className="h-3 w-5/6 rounded bg-zinc-800" />
+            <div className="h-3 w-2/3 rounded bg-zinc-800" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

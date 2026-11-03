@@ -47,7 +47,9 @@ export class GeminiSession implements ChatSession {
             ],
             thinkingConfig: { includeThoughts: true, thinkingLevel: THINKING_LEVEL[this.cfg.effort ?? "medium"] },
             maxOutputTokens: 16000,
-            abortSignal: AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
+            abortSignal: opts.signal
+              ? AbortSignal.any([AbortSignal.timeout(Math.max(1000, deadline - Date.now())), opts.signal])
+              : AbortSignal.timeout(Math.max(1000, deadline - Date.now())),
           },
         }),
       { classify: classifyGeminiError, deadline, onRetry: opts.onRetry, reserveMs: opts.reserveMs },

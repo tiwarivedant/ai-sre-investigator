@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { followUpInvestigation, newSession, startInvestigation } from "@/lib/investigation";
 import { loadFixture, recordedFollowUps, ReplaySession } from "@/lib/llm/replay";
-import { loadInvestigation } from "@/lib/store";
+import { INVESTIGATIONS_DIR, loadInvestigation } from "@/lib/store";
 
 // End-to-end regression over the recorded fixture (live Claude run inv-20261102195522-0f2da9:
 // initial investigation + owner confirmation + recovery report + resolution). Real tools,
@@ -11,7 +11,7 @@ import { loadInvestigation } from "@/lib/store";
 describe("replay fixture (inc-2213)", () => {
   const created: string[] = [];
   afterEach(() => {
-    for (const id of created) fs.rmSync(path.join(process.cwd(), ".investigations", `${id}.json`), { force: true });
+    for (const id of created) fs.rmSync(path.join(INVESTIGATIONS_DIR, `${id}.json`), { force: true });
   });
 
   it("reproduces the recorded investigation and its full incident lifecycle", async () => {

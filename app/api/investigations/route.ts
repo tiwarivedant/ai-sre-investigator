@@ -46,13 +46,15 @@ export async function POST(req: Request) {
   if (missing) return NextResponse.json({ error: `${missing} is not set for LLM_PROVIDER=${provider}` }, { status: 500 });
 
   try {
+    const controller = new AbortController(); // Stop aborts this run
     const id = await new Promise<string>((resolve, reject) => {
       let runId: string | undefined;
       startInvestigation(incident, {
         provider,
+        signal: controller.signal,
         onStart: (s) => {
           runId = s.id;
-          markRunning(s.id);
+          markRunning(s.id, controller);
           resolve(s.id);
         },
         onEvent: (e) => runId && publish(runId, e),

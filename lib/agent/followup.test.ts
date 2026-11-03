@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { followUpInvestigation, newInvestigationState } from "@/lib/investigation";
-import { saveInvestigation, loadInvestigation } from "@/lib/store";
+import { INVESTIGATIONS_DIR, saveInvestigation, loadInvestigation } from "@/lib/store";
 import { AnthropicSession } from "@/lib/llm/anthropic";
 import { toolSpecs } from "@/lib/tools";
 import { diffBriefs } from "./revisions";
@@ -37,7 +37,7 @@ describe("diffBriefs", () => {
 describe("followUpInvestigation", () => {
   const created: string[] = [];
   afterEach(() => {
-    for (const id of created) fs.rmSync(path.join(process.cwd(), ".investigations", `${id}.json`), { force: true });
+    for (const id of created) fs.rmSync(path.join(INVESTIGATIONS_DIR, `${id}.json`), { force: true });
   });
 
   it("stores the message as USER evidence, resumes the history, lets a human confirm, and records a revision", async () => {
@@ -101,7 +101,7 @@ describe("followUpInvestigation", () => {
 describe("follow-up rewrite gate", () => {
   const created: string[] = [];
   afterEach(() => {
-    for (const id of created) fs.rmSync(path.join(process.cwd(), ".investigations", `${id}.json`), { force: true });
+    for (const id of created) fs.rmSync(path.join(INVESTIGATIONS_DIR, `${id}.json`), { force: true });
   });
 
   it("rejects finalize until summary and impact are rewritten", async () => {

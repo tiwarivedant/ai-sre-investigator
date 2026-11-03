@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInvestigation } from "@/lib/client/useInvestigation";
-import { Brief } from "./components/Brief";
+import { Brief, ExportButton } from "./components/Brief";
 import { Trace } from "./components/Trace";
 import { EvidenceDrawer } from "./components/EvidenceDrawer";
 import { HistoryMenu } from "./components/History";
 import { EmptyState } from "./components/EmptyState";
+import { RunPill } from "./components/RunPill";
+import { ActionDialog } from "./components/ActionDialog";
 import { EvidenceContext } from "./components/ui";
 import {
   expectedFollowUp,
@@ -29,8 +31,10 @@ interface Config {
 
 
 export default function Home() {
-  const { state, info, running, progress, reset, load, error, errorCode, clearError, start, followUp, latestRevision, dismissRevision } = useInvestigation();
+  const { state, info, running, progress, reset, load, act, stop, error, errorCode, clearError, start, followUp, latestRevision, dismissRevision } = useInvestigation();
   const followUpInput = useRef<HTMLInputElement>(null);
+  const [dialog, setDialog] = useState<"resolve" | "reopen" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [changesOpen, setChangesOpen] = useState(false);
   // Live mode starts empty (prefilled text looks like a real, stale incident); replay mode
   // prefills the recorded sample once config arrives, since it is the only input replay accepts.
@@ -83,6 +87,7 @@ export default function Home() {
     start(incident.trim());
   };
 
+  const busy = running || state?.status === "running";
   const suggestions = state?.status !== "running" ? (state?.openQuestions ?? []).slice(0, 3) : [];
 
   const openInvestigation = useCallback(
@@ -162,6 +167,33 @@ export default function Home() {
             </div>
           ) : null}
 
+          {state && (
+            <div className="-mt-2 mb-3 flex justify-end gap-2" data-testid="brief-toolbar">
+              {!followUpLocked &&
+                (state.incidentStatus === "resolved" ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setDialog("reopen")}
+                    className="rounded-md border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40"
+                  >
+                    Reopen
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setDialog("resolve")}
+                    title={busy ? "Available when the agent finishes" : "Resolve the incident (records your comment as evidence)"}
+                    className="rounded-md border border-emerald-500/50 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-40"
+                  >
+                    Resolve
+                  </button>
+                ))}
+              <ExportButton state={state} />
+            </div>
+          )}
+
           {(replayBlocked || errorCode === REPLAY_MISMATCH) && (
             <div role="status" className="mb-4 flex flex-col gap-2 rounded-md border border-fuchsia-400/40 bg-fuchsia-500/5 px-3 py-2.5 sm:flex-row sm:items-center">
               <p className="flex-1 text-sm text-fuchsia-100">
@@ -230,7 +262,18 @@ export default function Home() {
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
               <div className="min-w-0">
                 {state ? (
-                  <Brief state={state} changed={changed} onQuestion={askAbout} />
+                  <>
+                    {(running || state.status === "running") && (
+                      <div className="mb-3">
+                        <RunPill steps={state.trace} progress={progress} followUp={state.revisions.length > 0 || (progress?.baseStep ?? 0) > 0} onStop={stop} />
+                      </div>
+                    )}
+                    <Brief
+                      state={state}
+                      changed={changed}
+                      onQuestion={askAbout}
+                    />
+                  </>
                 ) : (
                   <div className="rounded-lg border border-dashed border-zinc-800 px-6 py-16 text-center text-sm text-zinc-400">Starting the investigation…</div>
                 )}
@@ -263,7 +306,7 @@ export default function Home() {
           </footer>
         )}
 
-        {state && state.status !== "running" && !followUpLocked && (
+        {state && !followUpLocked && (
           <footer className="sticky bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur">
             {(followUpBlocked || errorCode === REPLAY_FOLLOWUP_MISMATCH) && sample && (
               <div role="status" className="mx-auto flex max-w-[1600px] flex-col gap-2 px-4 pt-2.5 sm:flex-row sm:items-center">
@@ -285,7 +328,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            {(suggestions.length > 0 || nextSampleFollowUp) && (
+            {!busy && (suggestions.length > 0 || nextSampleFollowUp) && (
               <div className="mx-auto flex max-w-[1600px] gap-1.5 overflow-x-auto px-4 pt-2.5">
                 {nextSampleFollowUp && (
                   <button
@@ -314,13 +357,15 @@ export default function Home() {
                 ))}
               </div>
             )}
+            {actionError && <p className="mx-auto max-w-[1600px] px-4 pt-2 text-sm text-red-300">{actionError}</p>}
             <form
-              className="mx-auto flex max-w-[1600px] gap-2 px-4 py-2.5"
+              className="mx-auto flex max-w-[1600px] flex-wrap gap-2 px-4 py-2.5 sm:flex-nowrap"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!message.trim() || running) return;
+                if (!message.trim() || busy) return;
                 if (replayedRun && (!nextSampleFollowUp || !matchesRecordedIncident(message, nextSampleFollowUp))) return setFollowUpBlocked(true);
                 setFollowUpBlocked(false);
+                setActionError(null);
                 followUp(message.trim());
                 setMessage("");
               }}
@@ -332,17 +377,37 @@ export default function Home() {
                 ref={followUpInput}
                 id="followup"
                 value={message}
+                disabled={busy}
                 onChange={(e) => {
                   setMessage(e.target.value);
                   if (followUpBlocked && nextSampleFollowUp && matchesRecordedIncident(e.target.value, nextSampleFollowUp)) setFollowUpBlocked(false);
                 }}
-                placeholder="Answer an open question or paste new evidence (e.g. “Marcus confirms he changed the pool”)"
-                className="flex-1 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none"
+                placeholder={
+                  busy
+                    ? "The agent is working. Follow-ups and notes unlock when it finishes (or press Stop)."
+                    : "Answer an open question or paste new evidence (e.g. “Marcus confirms he changed the pool”)"
+                }
+                className="min-w-0 flex-1 basis-full rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-zinc-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:basis-auto"
               />
               <button
+                type="button"
+                disabled={busy || !message.trim()}
+                title="Record as evidence without rerunning the agent"
+                onClick={async () => {
+                  setActionError(null);
+                  const r = await act("note", message.trim());
+                  if (r.ok) setMessage("");
+                  else setActionError(r.error);
+                }}
+                className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Add note
+              </button>
+              <button
                 type="submit"
-                disabled={running || !message.trim()}
-                className="rounded-md border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={busy || !message.trim()}
+                title="Rerun the agent with this information"
+                className="rounded-md border border-zinc-600 bg-zinc-800 px-4 py-2 text-sm text-zinc-100 hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Send follow-up
               </button>
@@ -351,6 +416,17 @@ export default function Home() {
         )}
       </div>
       <EvidenceDrawer id={evidenceId} investigationId={state?.id} onClose={closeDrawer} />
+      {dialog && state && (
+        <ActionDialog
+          mode={dialog}
+          status={state.incidentStatus}
+          onClose={() => setDialog(null)}
+          onSubmit={async (comment, confirm) => {
+            const r = await act(dialog, comment || undefined, confirm);
+            return r.ok ? null : r.error;
+          }}
+        />
+      )}
     </EvidenceContext.Provider>
   );
 }

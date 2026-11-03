@@ -119,7 +119,15 @@ export class ReplaySession implements ChatSession {
 
   async send(opts: SendOptions): Promise<ModelTurn> {
     // Simulated latency so streaming UIs behave like a live run (never past the deadline).
-    if (this.delayMs > 0) await new Promise((r) => setTimeout(r, Math.min(this.delayMs, Math.max(0, opts.timeoutMs - 50))));
+    if (this.delayMs > 0)
+      await new Promise<void>((resolve, reject) => {
+        const t = setTimeout(resolve, Math.min(this.delayMs, Math.max(0, opts.timeoutMs - 50)));
+        opts.signal?.addEventListener("abort", () => {
+          clearTimeout(t);
+          reject(Object.assign(new Error("Stopped"), { name: "AbortError" }));
+        });
+      });
+    if (opts.signal?.aborted) throw Object.assign(new Error("Stopped"), { name: "AbortError" });
 
     // Which recorded run are we in, and how many of its turns have been served?
     let runIndex = 0;

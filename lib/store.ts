@@ -22,6 +22,8 @@ export interface StoredInvestigation {
   sample?: boolean;
   /** For samples: where the recorded model turns came from. */
   recordedFrom?: string;
+  /** USER- evidence recorded by actions (notes, resolve, reopen) that the agent hasn't been shown yet. */
+  undeliveredNotes?: string[];
 }
 
 export interface InvestigationSummary {
@@ -35,11 +37,16 @@ export interface InvestigationSummary {
   model: string;
   sample: boolean;
   briefSource?: InvestigationState["briefSource"];
+  incidentStatus?: InvestigationState["incidentStatus"];
+  /** Not resolved (and not a finished sample). */
+  open: boolean;
   topHypothesis: { id: string; statement: string; confidence: number; status: string } | null;
   followUps: number;
 }
 
-const DIR = path.join(process.cwd(), ".investigations");
+// INVESTIGATIONS_DIR lets automated tests use their own folder instead of yours.
+export const INVESTIGATIONS_DIR = process.env.INVESTIGATIONS_DIR ? path.resolve(process.env.INVESTIGATIONS_DIR) : path.join(process.cwd(), ".investigations");
+const DIR = INVESTIGATIONS_DIR;
 export const SAMPLES_DIR = path.join(process.cwd(), "samples", "investigations");
 const SAMPLE_PREFIX = "sample-";
 
@@ -97,6 +104,8 @@ export function summarize(inv: StoredInvestigation): InvestigationSummary {
     model: inv.model,
     sample: !!inv.sample,
     briefSource: s.briefSource,
+    incidentStatus: s.incidentStatus,
+    open: s.incidentStatus !== "resolved",
     topHypothesis: top && { id: top.id, statement: top.statement, confidence: top.confidence, status: top.status },
     followUps: s.revisions.length,
   };
@@ -124,7 +133,9 @@ export function listInvestigations(limit = 50): { recent: InvestigationSummary[]
       .map(summarize)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   // Samples are numbered (01-, 02-, ...): show them in that order, not by date.
-  return { recent: load(ids(DIR)).slice(0, limit), samples: load(ids(SAMPLES_DIR, SAMPLE_PREFIX)).sort((a, b) => a.id.localeCompare(b.id)) };
+  // Open incidents first (newest first), then resolved ones.
+  const recent = load(ids(DIR)).sort((a, b) => Number(b.open) - Number(a.open) || b.updatedAt.localeCompare(a.updatedAt));
+  return { recent: recent.slice(0, limit), samples: load(ids(SAMPLES_DIR, SAMPLE_PREFIX)).sort((a, b) => a.id.localeCompare(b.id)) };
 }
 
 /** Most recently updated saved investigation, for CLI convenience. */

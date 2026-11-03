@@ -161,6 +161,10 @@ export interface InvestigationState {
   incidentStatus?: "insufficient-evidence" | "investigating" | "identified" | "mitigated" | "resolved";
   /** Does the data cover what was reported? Computed by code before the agent runs, refreshed with follow-ups. */
   coverage?: import("@/lib/analysis/coverage").Coverage;
+  /** Set by the Resolve action (a human decision, no model involved). Cleared by Reopen. */
+  resolution?: { evidenceId: string; at: string; recoveryVerified: boolean };
+  /** When the incident was last reopened; resolution reports from before this no longer count. */
+  reopenedAt?: string;
   /** Follow-ups classified as instructions (e.g. prompt injection): ignored, never evidence. */
   ignoredFollowUps?: { evidenceId: string; text: string; reason: string }[];
   /** Other incidents active in the data, shown separately from the answer (relationship to the report stated). */

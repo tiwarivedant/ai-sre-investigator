@@ -157,6 +157,31 @@ export function useInvestigation() {
     [connect],
   );
 
+  /** Responder actions (note / resolve / reopen): deterministic, no agent run. */
+  const act = useCallback(
+    async (action: "note" | "resolve" | "reopen", comment?: string, confirm = false): Promise<{ ok: true } | { ok: false; error: string; code?: string }> => {
+      if (!state) return { ok: false, error: "No investigation loaded." };
+      const res = await fetch(`/api/investigations/${state.id}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, comment, confirm }),
+      });
+      const body = await res.json();
+      if (!res.ok) return { ok: false, error: body.error ?? `Failed (${res.status})`, code: body.code };
+      const next = body.state as InvestigationState;
+      setState(next);
+      setLastRevisionAt(next.revisions.at(-1)?.at ?? null); // show "What changed"
+      return { ok: true };
+    },
+    [state],
+  );
+
+  /** Stop the run in progress; the server keeps the brief so far and ends the stream. */
+  const stop = useCallback(async () => {
+    if (!state) return;
+    await fetch(`/api/investigations/${state.id}/stop`, { method: "POST" });
+  }, [state]);
+
   /** Back to a blank page for a new incident. */
   const reset = useCallback(() => {
     source.current?.close();
@@ -175,5 +200,5 @@ export function useInvestigation() {
     setErrorCode(null);
   }, []);
 
-  return { state, info, running, progress, reset, load, error, errorCode, clearError, start, followUp, latestRevision, dismissRevision: () => setLastRevisionAt(null) };
+  return { state, info, running, progress, reset, load, act, stop, error, errorCode, clearError, start, followUp, latestRevision, dismissRevision: () => setLastRevisionAt(null) };
 }

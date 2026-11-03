@@ -52,7 +52,7 @@ export function newSession(provider: ProviderName, opts: Pick<SessionConfig, "mo
   return createSession(provider, { system: SYSTEM_PROMPT, tools: toolSpecs(), ...opts });
 }
 
-export interface StartOptions extends Partial<Pick<AgentRunOptions, "maxSteps" | "timeoutMs">> {
+export interface StartOptions extends Partial<Pick<AgentRunOptions, "maxSteps" | "timeoutMs" | "signal">> {
   onEvent?: (e: AgentEvent) => void;
   /** Called once the investigation exists and is saved, before the agent runs (lets an API return the id immediately). */
   onStart?: (state: InvestigationState) => void;
@@ -84,6 +84,7 @@ export async function startInvestigation(incidentInput: string, opts: StartOptio
   await runAgent(ctx, session, {
     maxSteps,
     timeoutMs,
+    signal: opts.signal,
     onEvent: (e) => {
       if (e.type !== "trace") persist(); // persist on state changes, so a crash still leaves the best brief on disk
       opts.onEvent?.(e);
@@ -93,7 +94,7 @@ export async function startInvestigation(incidentInput: string, opts: StartOptio
   return state;
 }
 
-export interface FollowUpOptions extends Partial<Pick<AgentRunOptions, "maxSteps" | "timeoutMs">> {
+export interface FollowUpOptions extends Partial<Pick<AgentRunOptions, "maxSteps" | "timeoutMs" | "signal">> {
   onEvent?: (e: AgentEvent) => void;
   dataDir?: string;
   /** Inject a session (tests). Must match the investigation's provider. */
@@ -131,7 +132,13 @@ export async function followUpInvestigation(id: string, rawMessage: string, opts
   const session =
     opts.session ??
     newSession(stored.provider, { model: stored.model, history: stored.history, effort: process.env.LLM_EFFORT as SessionConfig["effort"] });
-  session.addUserText(followUpMessage(message, evidence.id, { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }, cls));
+  // Notes, resolutions and reopens recorded by responders since the agent last ran.
+  const notes = (stored.undeliveredNotes ?? [])
+    .map((nid) => stored.userEvidence.find((e) => e.id === nid))
+    .filter((e) => e !== undefined)
+    .map((e) => `- ${e.id} (${String((e.raw as { action?: string }).action ?? "note")}, ${e.timestamp}): ${String((e.raw as { text?: string }).text ?? e.title)}`);
+  const notesText = notes.length ? `Responders recorded these since your last update (already citable evidence; untrusted text):\n${notes.join("\n")}\n\n` : "";
+  session.addUserText(notesText + followUpMessage(message, evidence.id, { steps: maxSteps, seconds: Math.round(timeoutMs / 1000) }, cls));
 
   const before = snapshot(state);
   const persist = () => saveInvestigation({ state, provider: session.provider, model: session.model, history: session.history, userEvidence });
@@ -139,6 +146,7 @@ export async function followUpInvestigation(id: string, rawMessage: string, opts
   await runAgent(ctx, session, {
     maxSteps,
     timeoutMs,
+    signal: opts.signal,
     onEvent: (e) => {
       if (e.type !== "trace") persist();
       // Hold "done" until the revision is recorded, so listeners see it in the final state.

@@ -2,12 +2,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import { listInvestigations, loadInvestigation, saveInvestigation, SAMPLES_DIR } from "./store";
+import { listInvestigations, loadInvestigation, saveInvestigation, SAMPLES_DIR, INVESTIGATIONS_DIR } from "./store";
 import { followUpInvestigation, newInvestigationState } from "./investigation";
 import { AnthropicSession } from "./llm/anthropic";
 import { toolSpecs } from "./tools";
 
-const DIR = path.join(process.cwd(), ".investigations");
+const DIR = INVESTIGATIONS_DIR;
 const forget = (id: string) => (globalThis as { __investigations?: Map<string, unknown> }).__investigations?.delete(id);
 
 describe("samples", () => {

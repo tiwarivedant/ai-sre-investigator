@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { InvestigationSummary } from "@/lib/store";
-import { confidenceWord, RunStatus } from "./ui";
+import { confidenceWord, formatElapsed, IncidentStatusBadge, RunStatus } from "./ui";
 
 interface Lists {
   recent: InvestigationSummary[];
@@ -43,7 +43,9 @@ export function InvestigationRow({ inv, active, onOpen }: { inv: InvestigationSu
     >
       <p className="line-clamp-2 text-sm text-zinc-200">{inv.incidentInput}</p>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
-        <RunStatus status={inv.status} />
+        <IncidentStatusBadge status={inv.incidentStatus} />
+        {inv.status !== "complete" && <RunStatus status={inv.status} />}
+        {inv.open && !inv.sample && <span title={`Opened ${new Date(inv.createdAt).toLocaleString()}`}>open {formatElapsed(inv.createdAt)}</span>}
         {inv.sample && <span className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px font-semibold tracking-wide text-sky-200 uppercase">Sample</span>}
         {inv.followUps > 0 && <span>{inv.followUps} follow-up{inv.followUps > 1 ? "s" : ""}</span>}
         {!inv.sample && (
@@ -68,6 +70,12 @@ export function InvestigationRow({ inv, active, onOpen }: { inv: InvestigationSu
       </p>
     </button>
   );
+}
+
+/** "2 open · 3 resolved" for the recent (non-sample) investigations. */
+export function openResolvedCount(recent: InvestigationSummary[]): string {
+  const open = recent.filter((r) => r.open).length;
+  return `${open} open · ${recent.length - open} resolved`;
 }
 
 /** Header dropdown: recent investigations and samples. */
@@ -112,7 +120,10 @@ export function HistoryMenu({ activeId, onOpen }: { activeId?: string; onOpen: (
             {!lists && !failed && <p className="px-2 py-3 text-xs text-zinc-500">Loading…</p>}
             {lists && (
               <>
-                <h3 className="px-2 pt-1 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Recent</h3>
+                <h3 className="flex items-baseline justify-between px-2 pt-1 pb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+                  Recent
+                  {lists.recent.length > 0 && <span className="font-normal tracking-normal normal-case" data-testid="open-count">{openResolvedCount(lists.recent)}</span>}
+                </h3>
                 {lists.recent.length === 0 && <p className="px-2 pb-2 text-xs text-zinc-500">None yet. Runs you start are saved here.</p>}
                 <div className="space-y-0.5">
                   {lists.recent.map((inv) => (

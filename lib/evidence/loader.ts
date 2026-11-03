@@ -50,14 +50,16 @@ export class EvidenceStore {
   }
 
   /** Pasted follow-up text becomes first-class, citable evidence (USER-001, ...). */
-  addUserEvidence(text: string, at = new Date().toISOString()): Evidence {
+  /** `action` tags evidence recorded by a responder action (note/resolve/reopen) rather than a follow-up message. */
+  addUserEvidence(text: string, at = new Date().toISOString(), action?: "note" | "resolve" | "reopen"): Evidence {
     const n = this.list().filter((e) => e.kind === "user").length + 1;
+    const label = action === "resolve" ? "Resolved: " : action === "reopen" ? "Reopened: " : action === "note" ? "Note: " : "";
     const e: Evidence = {
       id: `USER-${String(n).padStart(3, "0")}`,
       kind: "user",
       timestamp: at,
-      title: oneLine(text, 120),
-      raw: { text },
+      title: oneLine(`${label}${text}`, 120),
+      raw: action ? { text, action } : { text },
     };
     this.add(e);
     return e;

@@ -168,3 +168,28 @@ export function confidenceWord(value: number, status?: "active" | "rejected" | "
   if (value >= 0.4) return "Possible";
   return "Uncertain";
 }
+
+const INCIDENT_STYLE: Record<NonNullable<InvestigationState["incidentStatus"]>, { label: string; style: string }> = {
+  investigating: { label: "Investigating", style: "text-sky-200 bg-sky-500/10 border-sky-400/40" },
+  identified: { label: "Identified", style: "text-violet-200 bg-violet-500/10 border-violet-400/40" },
+  mitigated: { label: "Mitigated", style: "text-amber-200 bg-amber-500/10 border-amber-400/40" },
+  resolved: { label: "Resolved", style: "text-emerald-200 bg-emerald-500/10 border-emerald-400/40" },
+  "insufficient-evidence": { label: "Insufficient evidence", style: "text-orange-200 bg-orange-500/10 border-orange-400/40" },
+};
+
+/** Incident lifecycle badge (distinct from the run status). */
+export function IncidentStatusBadge({ status }: { status?: InvestigationState["incidentStatus"] }) {
+  const s = INCIDENT_STYLE[status ?? "investigating"];
+  return <span className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${s.style}`}>{s.label}</span>;
+}
+
+/** "45s", "12m", "3h 05m", "2d 4h" */
+export function formatElapsed(fromIso: string, now = Date.now()): string {
+  const s = Math.max(0, Math.round((now - Date.parse(fromIso)) / 1000));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ${String(m % 60).padStart(2, "0")}m`;
+  return `${Math.floor(h / 24)}d ${h % 24}h`;
+}

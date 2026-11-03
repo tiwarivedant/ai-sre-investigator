@@ -47,6 +47,8 @@ export interface SendOptions {
   onRetry?: (n: RetryNotice) => void;
   /** Don't accept a retry wait unless at least this much time would remain afterwards. */
   reserveMs?: number;
+  /** Aborts the call (the responder pressed Stop). */
+  signal?: AbortSignal;
 }
 
 export interface ChatSession {

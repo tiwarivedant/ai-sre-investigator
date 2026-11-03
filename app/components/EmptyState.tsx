@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { InvestigationRow, useInvestigationList } from "./History";
+import { InvestigationRow, openResolvedCount, useInvestigationList } from "./History";
 
 // Different ways a responder might first describe the same incident: vague, symptom-led, and
 // anchored on the obvious suspect (the agent has to test that suspicion, not accept it).
@@ -104,7 +104,14 @@ export function EmptyState({
       </div>
 
       <div className="mt-7">
-        <h3 className="mb-1 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">Recent investigations</h3>
+        <h3 className="mb-1 flex items-baseline justify-between text-[11px] font-semibold tracking-wider text-zinc-500 uppercase">
+          Recent investigations
+          {lists && lists.recent.length > 0 && (
+            <span className="font-normal tracking-normal normal-case" data-testid="open-count">
+              {openResolvedCount(lists.recent)}
+            </span>
+          )}
+        </h3>
         {failed && <p className="text-xs text-red-300">Couldn&apos;t load investigations.</p>}
         {!lists && !failed && <p className="text-xs text-zinc-600">Loading…</p>}
         {lists && lists.recent.length === 0 && lists.samples.length === 0 && <p className="text-xs text-zinc-600">None yet. Runs you start are saved here.</p>}

@@ -38,7 +38,7 @@ export class AnthropicSession implements ChatSession {
             output_config: { effort: this.cfg.effort ?? "medium" },
             cache_control: { type: "ephemeral" },
           },
-          { timeout: Math.max(1000, deadline - Date.now()), maxRetries: 0 },
+          { timeout: Math.max(1000, deadline - Date.now()), maxRetries: 0, signal: opts.signal },
         ),
       { classify: classifyAnthropicError, deadline, onRetry: opts.onRetry, reserveMs: opts.reserveMs },
     );

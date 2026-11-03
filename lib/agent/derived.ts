@@ -394,6 +394,7 @@ const RESOLVED = /\bresolv(ed|e the incident)\b|\bstable for (\d+|thirty|an?)\s*
  * (recovery after the fix reported), resolved (a later report says it held).
  */
 export function incidentStatus(state: InvestigationState, store: EvidenceStore): NonNullable<InvestigationState["incidentStatus"]> {
+  if (state.resolution) return "resolved"; // a responder resolved it (the Resolve action)
   if (state.coverage?.verdict === "none") return "insufficient-evidence";
   const lead = state.hypotheses.find((h) => h.status !== "rejected");
   if (!lead || lead.status !== "confirmed") return "investigating";
@@ -404,6 +405,8 @@ export function incidentStatus(state: InvestigationState, store: EvidenceStore):
   const resolvedReport = store
     .list()
     .filter((e) => e.kind === "user" && usable.has(e.id) && (e.timestamp ?? "") >= recoveredAt)
+    // Resolve/reopen action comments are handled explicitly; reports from before a reopen no longer count.
+    .filter((e) => !["resolve", "reopen"].includes(String((e.raw as { action?: string })?.action)) && (!state.reopenedAt || (e.timestamp ?? "") > state.reopenedAt))
     .some((e) => RESOLVED.test(String((e.raw as { text?: string })?.text ?? e.title)));
   return resolvedReport ? "resolved" : "mitigated";
 }

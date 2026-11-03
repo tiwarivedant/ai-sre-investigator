@@ -54,8 +54,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const missing = missingCredential(inv.provider);
   if (missing) return NextResponse.json({ error: `${missing} is not set (this investigation runs on ${inv.provider})` }, { status: 500 });
 
-  markRunning(id);
-  followUpInvestigation(id, message, { onEvent: (e) => publish(id, e) }).catch((err) => {
+  const signal = markRunning(id);
+  followUpInvestigation(id, message, { signal, onEvent: (e) => publish(id, e) }).catch((err) => {
     console.error(`follow-up on ${id} failed`, err);
     const state = loadInvestigation(id)?.state;
     if (state) {

@@ -17,6 +17,8 @@ export type AgentEvent =
 export interface AgentRunOptions {
   maxSteps: number; // model turns
   timeoutMs: number;
+  /** The responder pressed Stop: end the run now and keep the brief so far. */
+  signal?: AbortSignal;
   onEvent?: (e: AgentEvent) => void;
 }
 
@@ -51,7 +53,13 @@ export async function runAgent(ctx: ToolContext, session: ChatSession, opts: Age
     state.updatedAt = new Date().toISOString();
   };
 
+  const stoppedMsg = "Stopped by the responder; showing the brief so far.";
   for (let turn = 0; turn < opts.maxSteps && !finished; turn++) {
+    if (opts.signal?.aborted) {
+      trace({ label: "stopped", thought: stoppedMsg, ms: 0 });
+      end("partial", stoppedMsg);
+      break;
+    }
     const remaining = deadline - Date.now();
     if (remaining <= 0) {
       end("partial", timeoutMsg);
@@ -77,6 +85,7 @@ export async function runAgent(ctx: ToolContext, session: ChatSession, opts: Age
       response = await session.send({
         timeoutMs: remaining,
         reserveMs: MIN_TURN_MS,
+        signal: opts.signal,
         onRetry: (r) =>
           trace({
             label: "retry",
@@ -85,10 +94,11 @@ export async function runAgent(ctx: ToolContext, session: ChatSession, opts: Age
           }),
       });
     } catch (err) {
-      const timedOut = Date.now() >= deadline || isTimeout(err);
-      const reason = timedOut ? timeoutMsg : `Model call failed (${session.provider}): ${describeError(err)}`;
+      const stopped = opts.signal?.aborted === true;
+      const timedOut = !stopped && (Date.now() >= deadline || isTimeout(err));
+      const reason = stopped ? stoppedMsg : timedOut ? timeoutMsg : `Model call failed (${session.provider}): ${describeError(err)}`;
       trace({ label: "stopped", thought: reason, ms: Date.now() - t0 });
-      end(hasBrief(state) || timedOut ? "partial" : "error", reason);
+      end(hasBrief(state) || timedOut || stopped ? "partial" : "error", reason);
       break;
     }
     const modelMs = Date.now() - t0;
