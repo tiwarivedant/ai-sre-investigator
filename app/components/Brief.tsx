@@ -510,11 +510,8 @@ function Verdict({ state }: { state: InvestigationState }) {
   return (
     <section className="rounded-lg border border-zinc-700 bg-gradient-to-b from-zinc-900 to-zinc-900/40">
       <header className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2">
-        <RunStatus status={state.status} />
+        <RunStatus status={state.status} reason={state.statusReason} />
         <span className="min-w-0 truncate font-mono text-[11px] text-zinc-500">{state.id}</span>
-        <div className="ml-auto">
-
-        </div>
       </header>
       <div className="px-4 py-3">
         {state.incidentStatus === "insufficient-evidence" ? (

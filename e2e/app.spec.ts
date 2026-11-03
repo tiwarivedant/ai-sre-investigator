@@ -52,6 +52,8 @@ test.describe.serial("investigation lifecycle (replay)", () => {
     await expect(page.getByText("Likely cause", { exact: true })).toBeVisible();
     await expect(stepper(page)).toContainText("Investigating");
     await expect(page.getByTestId("brief-skeleton")).toBeHidden();
+    // A finished run is the normal case: no run badge that could read as "incident complete".
+    await expect(page.getByText(/^(complete|Partial brief|Agent error)$/)).toHaveCount(0);
   });
 
   test("a non-matching follow-up shows the replay notice", async () => {
@@ -111,6 +113,7 @@ test.describe.serial("investigation lifecycle (replay)", () => {
     await runPill(page).getByRole("button", { name: "Stop" }).click();
     await waitForRunToFinish(page);
     await expect(page.getByText("Stopped by the responder; showing the brief so far.").first()).toBeVisible();
+    await expect(page.getByText("Partial brief", { exact: true }).first()).toHaveAttribute("title", "Stopped by the responder; showing the brief so far.");
     await expect(page.locator("section").filter({ hasText: "Summary" }).first()).toBeVisible();
   });
 

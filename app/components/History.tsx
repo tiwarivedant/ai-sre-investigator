@@ -45,7 +45,7 @@ export function InvestigationRow({ inv, active, onOpen }: { inv: InvestigationSu
       <p className={inv.label ? "line-clamp-2 text-xs text-zinc-400" : "line-clamp-2 text-sm text-zinc-200"}>{inv.incidentInput}</p>
       <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
         <IncidentStatusBadge status={inv.incidentStatus} />
-        {inv.status !== "complete" && <RunStatus status={inv.status} />}
+        <RunStatus status={inv.status} reason={inv.statusReason} />
         {inv.open && !inv.sample && <span title={`Opened ${new Date(inv.createdAt).toLocaleString()}`}>open {formatElapsed(inv.createdAt)}</span>}
         {inv.sample && <span className="rounded border border-sky-400/40 bg-sky-500/10 px-1.5 py-px font-semibold tracking-wide text-sky-200 uppercase">Sample</span>}
         {inv.followUps > 0 && <span>{inv.followUps} follow-up{inv.followUps > 1 ? "s" : ""}</span>}

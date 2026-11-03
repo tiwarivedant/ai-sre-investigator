@@ -126,11 +126,26 @@ const RUN_STYLE: Record<InvestigationState["status"], string> = {
   error: "text-red-200 bg-red-500/10 border-red-400/40",
 };
 
-export function RunStatus({ status }: { status: InvestigationState["status"] }) {
+const RUN_LABEL: Record<InvestigationState["status"], string> = {
+  running: "Agent running",
+  complete: "",
+  partial: "Partial brief",
+  error: "Agent error",
+};
+
+/**
+ * The agent run's status (not the incident's). A finished run is the normal case and shows
+ * nothing, so it isn't read as the incident being complete; the rest need attention.
+ */
+export function RunStatus({ status, reason }: { status: InvestigationState["status"]; reason?: string }) {
+  if (status === "complete") return null;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-medium ${RUN_STYLE[status]}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-medium ${RUN_STYLE[status]} ${reason ? "cursor-help" : ""}`}
+      title={reason}
+    >
       {status === "running" && <span className="size-1.5 animate-pulse rounded-full bg-sky-300" />}
-      {status}
+      {RUN_LABEL[status]}
     </span>
   );
 }
