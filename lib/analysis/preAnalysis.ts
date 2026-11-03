@@ -4,6 +4,7 @@ import { correlateChanges, toChangeEvents, type CorrelatedChange } from "./corre
 import { assessAlerts, focusServices, groupAlerts, type AlertAssessment, type AlertGroup } from "./alerts";
 import { digestLogs, type LogPattern } from "./logs";
 import { buildTimeline, type TimelineEvent } from "./timeline";
+import { responderTexts, suspectChanges, type SuspectChange } from "./suspects";
 
 export interface PreAnalysis {
   onset?: string;
@@ -17,18 +18,21 @@ export interface PreAnalysis {
   timeline: TimelineEvent[];
   /** Support/customer-impact notes (CUST-), verbatim titles. */
   customerNotes: { id: string; title: string }[];
+  /** Changes every brief must test: in the window before onset, or named by a responder. */
+  suspects: SuspectChange[];
 }
 
 export function runPreAnalysis(store: EvidenceStore, correlationWindowMinutes = 30): PreAnalysis {
   const changePoints = detectChangePoints(store.metrics);
   const onset = detectOnset(changePoints);
   const changeEvents = toChangeEvents(store.deploys, store.configChanges, store.incidentDate);
+  const changes = onset ? correlateChanges(changeEvents, onset, changePoints, store.metrics, correlationWindowMinutes) : [];
   return {
     onset,
     focusServices: focusServices(store.alerts),
     changePoints,
     saturation: detectSaturation(store.metrics),
-    changes: onset ? correlateChanges(changeEvents, onset, changePoints, store.metrics, correlationWindowMinutes) : [],
+    changes,
     alerts: assessAlerts(store.alerts, store.catalog, onset),
     alertGroups: groupAlerts(store.alerts),
     logPatterns: digestLogs(store.logs),
@@ -37,6 +41,7 @@ export function runPreAnalysis(store: EvidenceStore, correlationWindowMinutes = 
       .list()
       .filter((e) => e.kind === "customer")
       .map((e) => ({ id: e.id, title: e.title })),
+    suspects: suspectChanges(changes, responderTexts(store.list())),
   };
 }
 
@@ -84,6 +89,11 @@ export function formatPreAnalysis(pa: PreAnalysis): string {
         }${c.concurrentChanges.length ? ` (confounded: ${c.concurrentChanges.join(", ")} happened within 5m)` : ""}`,
       );
     }
+  }
+
+  if (pa.suspects.length) {
+    lines.push(`\n### Suspect changes (each needs a hypothesis that you support or reject with evidence before finalize)`);
+    for (const s of pa.suspects) lines.push(`- ${s.id}: ${s.reasons.join("; ")}`);
   }
 
   lines.push(`\n### Alerts with heuristic noise flags`);

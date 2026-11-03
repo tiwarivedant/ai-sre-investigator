@@ -150,6 +150,8 @@ export interface InvestigationState {
   contributingFactors?: ContributingFactor[];
   /** Set when a matched past incident had the same failure and left action items open. */
   repeatIncident?: RepeatIncident;
+  /** Suspect changes (in the window before onset, or named by a responder) that no hypothesis tested. Computed by code. */
+  untestedSuspects?: string[];
   /** Code-flagged noise the agent judged to be signal, with its reason. */
   notNoise?: CitedNote[];
   /** Brief text that contradicts the hypotheses' status (checked by code). */

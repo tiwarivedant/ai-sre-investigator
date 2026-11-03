@@ -19,6 +19,7 @@ export function briefToMarkdown(s: InvestigationState): string {
     for (const need of new Set(s.coverage.uncovered.map((t) => whatToProvide(t)))) out.push(`- To investigate, provide ${need}.`);
   }
   for (const o of s.otherActiveIssues ?? []) out.push(`\n> **Other active incident:** ${o.title} (${ids(o.evidence)}); ${o.relationship.replace(/[.\s]+$/, "")}.`);
+  if (s.untestedSuspects?.length) out.push(`\n> **Untested suspects:** ${s.untestedSuspects.join(", ")} (no hypothesis supports or rules them out).`);
   if (s.consistencyIssues?.length) out.push(`\n> **Check this brief:** ${s.consistencyIssues.join("; ")}.`);
   for (const f of s.ignoredFollowUps ?? []) out.push(`\n> **Ignored follow-up** \`${f.evidenceId}\`: instruction-like text, not treated as evidence ("${f.text}").`);
   if (s.briefSource === "pre-analysis") {

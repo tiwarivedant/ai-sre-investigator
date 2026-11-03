@@ -30,7 +30,10 @@ const brief = {
   summary: "Leading explanation per CFG-502.",
   impact: "Checkout errors (MET-checkout.error_rate_pct); 87 support tickets (CUST-001).",
   timeline: [{ ts: "2026-10-28T13:52:00Z", evidenceId: "CFG-502", note: "pool raised" }],
-  hypotheses: [{ id: "H1", statement: "pool change", confidence: 0.8, status: "active", supporting: ["CFG-502"], contradicting: [], reasoning: "math" }],
+  hypotheses: [
+    { id: "H1", statement: "pool change", confidence: 0.8, status: "active", supporting: ["CFG-502"], contradicting: [], reasoning: "math" },
+    { id: "H2", statement: "payments deploy", confidence: 0.05, status: "rejected", supporting: ["DEP-102"], contradicting: [], reasoning: "payments metrics flat" },
+  ],
   nextActions: [{ action: "Revert pool", type: "config_revert", evidence: ["CFG-502"] }],
   openQuestions: ["Did the inventory team intend the pool change?"],
   stakeholderUpdate: "We know why. Fix in progress. Next update in 30 minutes.",

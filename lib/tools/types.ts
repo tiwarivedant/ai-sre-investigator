@@ -15,6 +15,8 @@ export interface ToolContext {
   mustRewrite?: Set<"summary" | "impact">;
   /** finalize rejects a contradictory brief once; after that the issues stay visible in the brief instead. */
   consistencyWarned?: boolean;
+  /** finalize rejects once while a suspect change has no hypothesis; after that the brief shows them as untested. */
+  suspectsWarned?: boolean;
   /** Class of the follow-up driving this run, if any. Claims and instructions may not move confidence. */
   followUpKind?: import("@/lib/analysis/followups").FollowUpKind;
   /** Hypothesis confidences before this follow-up, restored after a claim/instruction follow-up. */

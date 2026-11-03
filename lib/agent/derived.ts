@@ -5,6 +5,7 @@ import { cleanFollowUp } from "@/lib/text";
 import { checkCoverage, whatToProvide } from "@/lib/analysis/coverage";
 import { assessRisk } from "./policy";
 import { evidenceFollowUps, followUpClasses } from "@/lib/analysis/followups";
+import { responderTexts, suspectChanges, untestedSuspects } from "@/lib/analysis/suspects";
 import type { ContributingFactor, InvestigationState, NextAction, RepeatIncident, SimilarIncident, TimelineEntry } from "@/lib/types";
 
 // Deterministic checks recomputed after every brief update. Code does the
@@ -664,6 +665,10 @@ export function refreshDerived(state: InvestigationState, pa: PreAnalysis, store
 
   state.unexplained = unexplainedSignals(state, pa, store);
   state.consistencyIssues = consistencyIssues(state, pa.onset, notEvidence);
+  // Every suspect change needs a hypothesis that supports or rejects it (the report and follow-ups can name more).
+  // When the data says nothing about the report, there is no onset to test changes against.
+  const suspects = suspectChanges(pa.changes, responderTexts(store.list(), state.incidentInput));
+  state.untestedSuspects = insufficient ? [] : untestedSuspects(suspects, state.hypotheses);
   // One rule for confidence: the brief's overall confidence is the leading hypothesis's.
   state.overallConfidence = state.hypotheses.find((h) => h.status !== "rejected")?.confidence ?? 0;
 }

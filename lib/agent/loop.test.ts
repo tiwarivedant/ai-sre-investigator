@@ -5,6 +5,7 @@ import { buildContext, newInvestigationState } from "@/lib/investigation";
 import { AnthropicSession } from "@/lib/llm/anthropic";
 import { toolSpecs } from "@/lib/tools";
 import { checkGrounding } from "./grounding";
+import { briefToMarkdown } from "@/lib/brief/markdown";
 
 // The loop is tested against a scripted fake client: no network, deterministic.
 
@@ -47,11 +48,22 @@ const goodHypothesis = {
   reasoning: "pool math",
 };
 
+// The payments deploy (DEP-102) is a suspect change: a complete brief tests it.
+const ruledOutDeploy = {
+  id: "H2",
+  statement: "payments deploy DEP-102 broke checkout",
+  confidence: 0.05,
+  status: "rejected",
+  supporting: ["DEP-102"],
+  contradicting: ["MET-payments.error_rate_pct"],
+  reasoning: "payments' own error rate never moved",
+};
+
 const completeBrief = {
   summary: "Leading explanation per CFG-502.",
   impact: "Checkout errors (MET-checkout.error_rate_pct); 87 support tickets (CUST-001).",
   timeline: [{ ts: "2026-10-28T13:52:00Z", evidenceId: "CFG-502", note: "pool raised" }],
-  hypotheses: [goodHypothesis],
+  hypotheses: [goodHypothesis, ruledOutDeploy],
   nextActions: [{ action: "Revert pool", owner: "@inventory-oncall", type: "config_revert", evidence: ["CFG-502"] }],
   openQuestions: ["Did the inventory team intend the pool change?"],
   stakeholderUpdate: "Customers see checkout errors. We know why. Fix in progress.",
@@ -224,5 +236,70 @@ describe("runAgent", () => {
     expect(state.status).toBe("partial");
     expect(state.statusReason).toMatch(/boom/);
     expect(state.hypotheses).toHaveLength(1);
+  });
+
+  describe("suspect changes at finalize", () => {
+    // DEP-102 (payments deploy, 8m before onset, named in chat) and CFG-502 are the suspects.
+    const onlyPool = { ...completeBrief, hypotheses: [goodHypothesis] };
+
+    it("blocks finalize once, naming the untested suspect, and the extra turn counts against the budget", async () => {
+      const { ctx, state } = setup();
+      const { client, requests } = fakeClient([
+        [{ type: "tool_use", name: "update_investigation", input: onlyPool }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "enough" } }],
+        [{ type: "tool_use", name: "update_investigation", input: { hypotheses: [goodHypothesis, ruledOutDeploy] } }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "deploy ruled out" } }],
+      ]);
+      await runAgent(ctx, session(client), opts(4));
+
+      const reminder = (requests[2].messages.at(-1)!.content as Anthropic.ToolResultBlockParam[])[0];
+      expect(reminder.is_error).toBe(true);
+      expect(String(reminder.content)).toContain(
+        "These suspect changes were not evaluated: DEP-102. Test each against the evidence before finalizing.",
+      );
+      expect(state.trace.filter((t) => t.tool === "finalize").map((t) => t.resultSummary)).toEqual([
+        "finalize rejected: untested suspects DEP-102",
+        expect.stringMatching(/^finalized/),
+      ]);
+      expect(requests).toHaveLength(4); // all four turns of a 4-turn budget used
+      expect(state.status).toBe("complete");
+      expect(state.untestedSuspects).toEqual([]);
+    });
+
+    it("accepts a brief that rejects the suspect with evidence on the first finalize", async () => {
+      const { ctx, state } = setup();
+      const { client } = fakeClient([
+        [{ type: "tool_use", name: "update_investigation", input: completeBrief }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "enough" } }],
+      ]);
+      await runAgent(ctx, session(client), opts());
+      expect(state.trace.filter((t) => t.tool === "finalize").map((t) => t.resultSummary)).toEqual([expect.stringMatching(/^finalized/)]);
+      expect(state.untestedSuspects).toEqual([]);
+    });
+
+    it("only blocks once; a second finalize goes through and the brief shows the untested suspect", async () => {
+      const { ctx, state } = setup();
+      const { client } = fakeClient([
+        [{ type: "tool_use", name: "update_investigation", input: onlyPool }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "enough" } }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "still enough" } }],
+      ]);
+      await runAgent(ctx, session(client), opts());
+      expect(state.status).toBe("complete");
+      expect(state.untestedSuspects).toEqual(["DEP-102"]);
+    });
+
+    it("shows the untested suspect when the budget runs out before the agent tests it", async () => {
+      const { ctx, state } = setup();
+      const { client } = fakeClient([
+        [{ type: "tool_use", name: "update_investigation", input: onlyPool }],
+        [{ type: "tool_use", name: "finalize", input: { rationale: "enough" } }],
+        [{ type: "tool_use", name: "get_changes", input: {} }],
+      ]);
+      await runAgent(ctx, session(client), opts(3));
+      expect(state.status).toBe("partial");
+      expect(state.untestedSuspects).toEqual(["DEP-102"]);
+      expect(briefToMarkdown(state)).toContain("**Untested suspects:** DEP-102");
+    });
   });
 });

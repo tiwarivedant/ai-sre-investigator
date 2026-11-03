@@ -43,6 +43,12 @@ export function Brief({
       )}
       <Verdict state={state} />
 
+      {(state.untestedSuspects?.length ?? 0) > 0 && state.status !== "running" && (
+        <div role="alert" data-testid="untested-suspects" className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+          <span className="font-semibold">Untested suspects: {state.untestedSuspects!.join(", ")}.</span> Changes made shortly before onset or named by
+          responders that no hypothesis supports or rules out. Check them before trusting the likely cause.
+        </div>
+      )}
       {(state.consistencyIssues?.length ?? 0) > 0 && state.status !== "running" && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
           <span className="font-semibold">Check this brief:</span> {state.consistencyIssues!.join("; ")}.

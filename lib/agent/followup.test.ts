@@ -34,6 +34,9 @@ describe("diffBriefs", () => {
   });
 });
 
+// The payments deploy (DEP-102) is a suspect change; briefs keep the hypothesis that ruled it out.
+const ruledOut = () => h({ id: "H2", statement: "payments deploy", confidence: 0.05, status: "rejected", supporting: ["DEP-102"] });
+
 describe("followUpInvestigation", () => {
   const created: string[] = [];
   afterEach(() => {
@@ -46,7 +49,7 @@ describe("followUpInvestigation", () => {
       status: "complete",
       summary: "s", impact: "i", stakeholderUpdate: "u", overallConfidence: 0.85,
       timeline: [{ ts: "2026-10-28T13:52:00Z", evidenceId: "CFG-502", note: "pool" }],
-      hypotheses: [h({})],
+      hypotheses: [h({}), ruledOut()],
       openQuestions: ["Was CFG-502 intentional?"],
       nextActions: [{ action: "Revert pool", type: "config_revert", risk: "low", riskReason: "rubric", phase: "now", evidence: ["CFG-502"] }],
       trace: [{ step: 4, thought: "", tool: "finalize", ms: 1 }],
@@ -61,7 +64,7 @@ describe("followUpInvestigation", () => {
 
     const turns = [
       [{ type: "tool_use", id: "t1", name: "update_investigation", input: {
-        hypotheses: [h({ status: "confirmed", confidence: 0.97, supporting: ["CFG-502", "USER-001"] })],
+        hypotheses: [h({ status: "confirmed", confidence: 0.97, supporting: ["CFG-502", "USER-001"] }), ruledOut()],
         overallConfidence: 0.97,
         openQuestions: [],
         summary: "The inventory owner confirmed CFG-502 (USER-001); it exhausted orders-db connections.",
@@ -110,13 +113,13 @@ describe("follow-up rewrite gate", () => {
       status: "complete",
       summary: "Likely CFG-502, not yet human-confirmed.", impact: "i", stakeholderUpdate: "u", overallConfidence: 0.85,
       timeline: [{ ts: "2026-10-28T13:52:00Z", evidenceId: "CFG-502", note: "pool" }],
-      hypotheses: [h({})], openQuestions: ["q"],
+      hypotheses: [h({}), ruledOut()], openQuestions: ["q"],
       nextActions: [{ action: "Revert pool", type: "config_revert", risk: "low", riskReason: "rubric", phase: "now", evidence: ["CFG-502"] }],
     };
     created.push(state.id);
     saveInvestigation({ state, provider: "anthropic", model: "fake", history: [{ role: "user", content: "initial" }], userEvidence: [] });
     const turns = [
-      [{ type: "tool_use", id: "a", name: "update_investigation", input: { hypotheses: [h({ status: "confirmed", supporting: ["CFG-502", "USER-001"] })] } }],
+      [{ type: "tool_use", id: "a", name: "update_investigation", input: { hypotheses: [h({ status: "confirmed", supporting: ["CFG-502", "USER-001"] }), ruledOut()] } }],
       [{ type: "tool_use", id: "b", name: "finalize", input: { rationale: "done" } }],
       [{ type: "tool_use", id: "c", name: "update_investigation", input: { summary: "The owner confirmed CFG-502 (USER-001) exhausted orders-db connections.", impact: "87 tickets (CUST-001)." } }],
       [{ type: "tool_use", id: "d", name: "finalize", input: { rationale: "done" } }],

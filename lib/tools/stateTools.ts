@@ -159,6 +159,14 @@ export const finalize = defineTool({
         isError: true,
       };
     }
+    if (s.untestedSuspects?.length && !ctx.suspectsWarned) {
+      ctx.suspectsWarned = true;
+      return {
+        result: { error: untestedSuspectsReminder(s.untestedSuspects) },
+        summary: `finalize rejected: untested suspects ${s.untestedSuspects.join(", ")}`,
+        isError: true,
+      };
+    }
     if (s.consistencyIssues?.length && !ctx.consistencyWarned) {
       ctx.consistencyWarned = true;
       return {
@@ -172,6 +180,9 @@ export const finalize = defineTool({
 });
 
 export const stateTools = [updateInvestigation, finalize];
+
+export const untestedSuspectsReminder = (ids: string[]) =>
+  `These suspect changes were not evaluated: ${ids.join(", ")}. Test each against the evidence before finalizing.`;
 
 const customerIds = (ctx: ToolContext) =>
   ctx.store
